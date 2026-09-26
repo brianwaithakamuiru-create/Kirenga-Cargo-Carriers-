@@ -141,6 +141,23 @@ export interface Shipment {
   updatedAt: string;
 }
 
+export interface PublicShipmentTracking {
+  id: string;
+  shipmentNumber: string;
+  status: ShipmentStatus;
+  originCountry: string;
+  originCity: string;
+  destinationCountry: string;
+  destinationCity: string;
+  cargoType: string;
+  weightKg: number;
+  pickupDate?: string;
+  expectedDelivery?: string;
+  actualDelivery?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface GPSLocationUpdate {
   id?: string;
   latitude: number;
