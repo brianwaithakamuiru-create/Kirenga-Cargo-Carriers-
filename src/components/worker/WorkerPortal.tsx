@@ -142,10 +142,10 @@ export const WorkerPortal: React.FC<WorkerPortalProps> = ({ onNavigate }) => {
   };
 
   const navItems: { key: WorkerNavKey; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
-    { key: 'staff-command', label: 'Staff Command', icon: Briefcase },
+    { key: 'staff-command', label: 'Dashboard', icon: Briefcase },
     { key: 'my-profile', label: 'My Profile', icon: User },
-    { key: 'my-department', label: 'My Department', icon: Building },
-    { key: 'assigned-work', label: 'Assigned Work', icon: CheckSquare, count: assignedTasks.length },
+    { key: 'my-department', label: 'Department', icon: Building },
+    { key: 'assigned-work', label: 'Tasks', icon: CheckSquare, count: assignedTasks.length },
     { key: 'documents', label: 'Documents', icon: FileText, count: departmentDocs.length },
     { key: 'notifications', label: 'Notifications', icon: Bell, count: notifications.length },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
