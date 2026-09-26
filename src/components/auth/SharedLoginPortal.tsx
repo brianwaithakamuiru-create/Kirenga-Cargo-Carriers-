@@ -28,10 +28,11 @@ interface SharedLoginPortalProps {
 }
 
 export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
-  const { signIn, signInWithGoogle, signInWithAdminProvider, sendPasswordReset } = useAuth();
+  const { signIn, signInWithGoogle, signInWithAdminProvider, signInWithAdminPin, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [adminPin, setAdminPin] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [selectedPortal, setSelectedPortal] = useState<'driver' | 'staff' | 'admin'>('staff');
@@ -97,6 +98,31 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAdminPinSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const pin = adminPin.replace(/\\D/g, '').slice(0, 5);
+    if (!/^\\d{5}$/.test(pin)) {
+      setError('Enter the five-digit administrator PIN.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const profile = await signInWithAdminPin(pin);
+      if (profile.mustChangePassword) {
+        onNavigate('change-password');
+        return;
+      }
+      onNavigate('admin');
+    } catch (err: any) {
+      setError(err.message || 'Administrator PIN sign-in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -266,141 +292,61 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
 
           {selectedPortal === 'admin' && (
-            <p className="mb-4 -mt-3 text-center text-xs text-cyan-200">
-              Administrator access uses a verified authorized identity. No PIN or password is required at sign-in.
-            </p>
-          )}
-
-          {/* Validation / Error Banner */}
-          {error && (
-            <div className="mb-6 p-3.5 rounded-xl bg-red-950/70 border border-red-500/40 text-red-200 text-xs flex items-start gap-2.5">
-              <AlertCircle className="w-4 h-4 flex-shrink-0 text-red-400 mt-0.5" />
-              <span className="leading-relaxed">{error}</span>
-            </div>
-          )}
-
-          {selectedPortal !== 'admin' && <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email or Username */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
-                Email address
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <User className="w-4 h-4" />
-                </div>
-                <input
-                  type="text"
-                  value={emailOrUsername}
-                  onChange={(e) => setEmailOrUsername(e.target.value)}
-                  placeholder={selectedPortal === 'admin' ? 'kirengacargo@gmail.com' : 'Enter your registered email address'}
-                  className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-sans"
-                  autoComplete="username"
-                  required
-                />
+            <form onSubmit={handleAdminPinSignIn} className="mt-5 space-y-5">
+              <div className="flex items-center gap-3 mb-2 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
+                <span className="h-px flex-1 bg-slate-800" />
+                <span>Administrator PIN</span>
+                <span className="h-px flex-1 bg-slate-800" />
               </div>
-            </div>
 
-            {/* Password */}
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider font-mono">
-                  Password
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
+                  Administrator PIN
                 </label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForgotInput(emailOrUsername);
-                    setForgotError(null);
-                    setForgotSuccess(null);
-                    setForgotStatusType('idle');
-                    setForgotModalOpen(true);
-                  }}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
-                >
-                  Forgot Password?
-                </button>
-              </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                  <Lock className="w-4 h-4" />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+                    <Shield className="w-4 h-4" />
+                  </div>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    pattern="[0-9]{5}"
+                    maxLength={5}
+                    value={adminPin}
+                    onChange={(e) => setAdminPin(e.target.value.replace(/\\D/g, '').slice(0, 5))}
+                    placeholder="Enter 5-digit PIN"
+                    autoComplete="one-time-code"
+                    className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-mono tracking-[0.35em]"
+                    required
+                  />
                 </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter account password"
-                  className="w-full pl-10 pr-11 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-sans"
-                  autoComplete="current-password"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200 transition-colors"
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                <p className="mt-2 text-[11px] text-slate-500 text-center">
+                  Use the administrator PIN assigned to the workplace.
+                </p>
               </div>
-            </div>
 
-            {/* Remember Session */}
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-cyan-400 focus:ring-offset-slate-900"
-                />
-                <span className="text-xs text-slate-300">Remember session on this device</span>
-              </label>
-            </div>
-
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-[0.99] disabled:opacity-60 cursor-pointer"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span>Verifying credentials...</span>
-                </>
-              ) : (
-                <>
-                  <span>Login</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>}
-          {selectedPortal === 'admin' && (
-            <div className="mt-5">
-              <div className="flex items-center gap-3 mb-4 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
-                <span className="h-px flex-1 bg-slate-800" />
-                <span>Administrator sign-in</span>
-                <span className="h-px flex-1 bg-slate-800" />
-              </div>
               <button
-                type="button"
-                onClick={() => void handleAdminProviderSignIn('google.com')}
+                type="submit"
                 disabled={loading}
-                className="w-full py-3 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
+                className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-[0.99] disabled:opacity-60"
               >
-                <span aria-hidden="true" className="text-lg font-bold text-blue-600">G</span>
-                <span>{loading ? 'Connecting…' : 'Continue with Google'}</span>
+                {loading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>Connecting to workplace...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Enter Administrator Workplace</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
-              <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
-                Use an identity already linked to the active administrator account.
+
+              <p className="text-center text-[11px] leading-relaxed text-slate-500">
+                Secure PIN authentication is verified by the server and Firebase.
               </p>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button type="button" onClick={() => void handleAdminProviderSignIn('apple.com')} disabled={loading} className="rounded-xl border border-slate-700 bg-black px-3 py-3 text-sm font-semibold text-white disabled:opacity-60">Continue with Apple</button>
-                <button type="button" onClick={() => void handleAdminProviderSignIn('microsoft.com')} disabled={loading} className="rounded-xl border border-slate-700 bg-white px-3 py-3 text-sm font-semibold text-slate-900 disabled:opacity-60">Continue with Microsoft</button>
-              </div>
-            </div>
+            </form>
           )}
 
 
