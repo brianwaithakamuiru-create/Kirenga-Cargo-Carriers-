@@ -3,6 +3,7 @@ import {
   User,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithCustomToken,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
@@ -33,6 +34,7 @@ interface AuthContextType {
   systemSettings: SystemSettings;
   signIn: (emailOrUsername: string, pass: string, remember?: boolean, expectedRole?: 'admin' | 'customer' | 'driver' | 'staff') => Promise<UserProfile>;
   signInWithGoogle: () => Promise<UserProfile>;
+  signInWithAdminPin: (pin: string) => Promise<UserProfile>;
   signInWithAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<UserProfile>;
   linkGoogleAccount: () => Promise<void>;
   linkAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<void>;
@@ -340,6 +342,58 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       action: 'USER_LOGIN',
       targetUid: authUser.uid,
       details: `Successful sign-in with role ${profile.role}`,
+    }).catch(() => {});
+
+    return profile;
+  };
+
+  const signInWithAdminPin = async (pin: string): Promise<UserProfile> => {
+    if (!/^\\d{5}$/.test(pin)) {
+      throw new Error('Enter the five-digit administrator PIN.');
+    }
+
+    if (persistenceRef.current !== true) {
+      await setPersistence(auth, browserLocalPersistence);
+      persistenceRef.current = true;
+    }
+
+    const response = await fetch('/api/admin-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.token) {
+      throw new Error(result.error || 'Administrator PIN sign-in failed.');
+    }
+
+    let credential;
+    try {
+      credential = await signInWithCustomToken(auth, result.token);
+    } catch (error: any) {
+      throw new Error(error?.message || 'Firebase could not complete administrator sign-in.');
+    }
+
+    const profile = await db.getUserProfile(credential.user.uid);
+    if (!profile || profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('The authenticated account is not an active administrator.');
+    }
+
+    profileCacheRef.current.set(credential.user.uid, profile);
+    setCurrentUser(credential.user);
+    setUserProfile(profile);
+    setIsSessionLocked(false);
+
+    void db.logAudit({
+      actorUid: credential.user.uid,
+      actorRole: 'ADMIN',
+      action: 'USER_LOGIN',
+      targetUid: credential.user.uid,
+      details: 'Administrator signed in with PIN.',
     }).catch(() => {});
 
     return profile;
