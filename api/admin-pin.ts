@@ -48,7 +48,18 @@ export default async function handler(request: Request, response: Response) {
     const app = getAdminApp();
     const adminAuth = getAuth(app);
     const firestore = getFirestore(app);
-    const adminUser = await adminAuth.getUserByEmail('kirengacargo@gmail.com');
+    let adminUser;
+    try {
+      adminUser = await adminAuth.getUserByEmail('kirengacargo@gmail.com');
+    } catch (error: any) {
+      if (error?.code !== 'auth/user-not-found') throw error;
+      adminUser = await adminAuth.createUser({
+        email: 'kirengacargo@gmail.com',
+        emailVerified: true,
+        disabled: false,
+      });
+    }
+
     const profileSnapshot = await firestore.collection('users').doc(adminUser.uid).get();
     const profile = profileSnapshot.data();
 
