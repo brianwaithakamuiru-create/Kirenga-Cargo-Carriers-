@@ -31,7 +31,7 @@ interface AdminSecurityProps {
 }
 
 export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'users' }) => {
-  const { currentUser, userProfile, changePassword, linkGoogleAccount, systemSettings } = useAuth();
+  const { currentUser, userProfile, changePassword, linkGoogleAccount, linkAdminProvider, systemSettings } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'audit' | 'autolock' | 'password'>(initialSubTab);
 
@@ -51,6 +51,9 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
   const [googleLinking, setGoogleLinking] = useState(false);
   const [googleLinkMessage, setGoogleLinkMessage] = useState<string | null>(null);
   const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
+  const [identityLinking, setIdentityLinking] = useState<string | null>(null);
+  const [identityLinkMessage, setIdentityLinkMessage] = useState<string | null>(null);
+  const [identityLinkError, setIdentityLinkError] = useState<string | null>(null);
 
   // Audit Logs state
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -115,6 +118,20 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
       setGoogleLinkError(err.message || 'Could not link this Google account.');
     } finally {
       setGoogleLinking(false);
+    }
+  };
+
+  const handleLinkAdminProvider = async (provider: 'apple.com' | 'microsoft.com') => {
+    setIdentityLinking(provider);
+    setIdentityLinkMessage(null);
+    setIdentityLinkError(null);
+    try {
+      await linkAdminProvider(provider);
+      setIdentityLinkMessage((provider === 'apple.com' ? 'Apple' : 'Microsoft') + ' sign-in is linked to this administrator account.');
+    } catch (err: any) {
+      setIdentityLinkError(err.message || 'Could not link this sign-in provider.');
+    } finally {
+      setIdentityLinking(null);
     }
   };
 
@@ -406,6 +423,24 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
             )}
             {googleLinkMessage && <p className="text-xs text-emerald-300">{googleLinkMessage}</p>}
             {googleLinkError && <p className="text-xs text-red-300">{googleLinkError}</p>}
+            <div className="flex flex-wrap gap-2 pt-1">
+              {([
+                { id: 'apple.com', label: 'Apple' },
+                { id: 'microsoft.com', label: 'Microsoft' },
+              ] as const).map((item) => {
+                const linked = currentUser?.providerData.some((provider) => provider.providerId === item.id);
+                return linked ? (
+                  <span key={item.id} className="rounded-lg border border-emerald-500/30 px-3 py-2 text-xs text-emerald-300">{item.label} linked</span>
+                ) : (
+                  <button key={item.id} type="button" onClick={() => void handleLinkAdminProvider(item.id)} disabled={Boolean(identityLinking)} className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-200 disabled:opacity-60">
+                    {identityLinking === item.id ? 'Linking…' : 'Link ' + item.label}
+                  </button>
+                );
+              })}
+            </div>
+            {identityLinkMessage && <p className="text-xs text-emerald-300">{identityLinkMessage}</p>}
+            {identityLinkError && <p role="alert" className="text-xs text-red-300">{identityLinkError}</p>}
+            <p className="text-[11px] leading-relaxed text-slate-500">Each provider must be enabled and configured in Firebase Authentication before it can be linked or used to sign in.</p>
           </div>
 
           {passSuccess && (

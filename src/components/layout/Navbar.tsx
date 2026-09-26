@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Shield, Compass, Briefcase, LogOut, Search, PackageCheck } from 'lucide-react';
+import { Menu, X, Shield, Compass, Briefcase, LogOut, Search, PackageCheck, LogIn, UserRound } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CompanyLogo } from '../common/CompanyLogo';
 
@@ -26,6 +26,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
     if (role === 'admin') onNavigate('admin');
     else if (role === 'driver') onNavigate('driver');
     else if (role === 'worker' || role === 'staff') onNavigate('staff');
+    else if (role === 'customer') onNavigate('customer');
     else onNavigate('home');
   };
 
@@ -55,11 +56,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                   {role === 'admin' && <Shield className="w-3.5 h-3.5" />}
                   {role === 'driver' && <Compass className="w-3.5 h-3.5" />}
                   {(role === 'worker' || role === 'staff') && <Briefcase className="w-3.5 h-3.5" />}
+                  {role === 'customer' && <UserRound className="w-3.5 h-3.5" />}
                   <span>
                     {role === 'admin'
                       ? 'Admin Central'
                       : role === 'driver'
                       ? 'Driver Portal'
+                      : role === 'customer'
+                      ? 'Client Portal'
                       : 'Staff Workplace'}
                   </span>
                 </button>
@@ -114,7 +118,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             })}
           </nav>
 
-          {/* Action CTAs: Track + Book Delivery */}
+          {/* Action CTAs: Track, Book Delivery, and Sign In */}
           <div className="hidden sm:flex items-center space-x-3">
             <button
               onClick={() => onNavigate('track')}
@@ -124,6 +128,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
               <span>Track Cargo</span>
             </button>
 
+            {!currentUser && (
+              <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl border border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/50 text-xs font-semibold flex items-center gap-1.5">
+                <LogIn className="w-3.5 h-3.5" /><span>Sign in</span>
+              </button>
+            )}
             <button
               onClick={() => onNavigate('book')}
               className="px-4 py-2 rounded-xl btn-primary-cyan text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 shadow-md active:scale-95 transition-all"
@@ -169,6 +178,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
           </nav>
 
           <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
+            {!currentUser && (
+              <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="w-full py-2.5 rounded-xl border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center justify-center gap-2">
+                <LogIn className="w-4 h-4" /><span>Sign in to your portal</span>
+              </button>
+            )}
             <button
               onClick={() => {
                 onNavigate('track');

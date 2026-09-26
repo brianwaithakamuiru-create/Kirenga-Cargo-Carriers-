@@ -12,9 +12,11 @@ import {
   Clock,
   Download,
   AlertCircle,
-  FileCheck
+  FileCheck,
+  RefreshCw
 } from 'lucide-react';
 import { db, COLLECTIONS } from '../../lib/firestoreService';
+import { useAuth } from '../../context/AuthContext';
 import { Shipment, Quote, Invoice, Payment, SupportTicket } from '../../types';
 import { EmptyState } from '../common/EmptyState';
 import { BookingForm } from '../public/BookingForm';
@@ -25,12 +27,14 @@ interface CustomerPortalProps {
 }
 
 export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) => {
+  const { currentUser, userProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'shipments' | 'quotes' | 'invoices' | 'support' | 'new-booking'>('overview');
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [quotes, setQuotes] = useState<Quote[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // New Support Ticket modal / form
   const [showNewTicketModal, setShowNewTicketModal] = useState(false);
@@ -38,40 +42,42 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) =>
   const [ticketCategory, setTicketCategory] = useState('Shipment Inquiry');
   const [ticketDescription, setTicketDescription] = useState('');
   const [ticketShipmentNumber, setTicketShipmentNumber] = useState('');
-  const [ticketCustomerName, setTicketCustomerName] = useState('Apex Minerals Shipper');
+
 
   const loadCustomerData = async () => {
+    if (!currentUser?.uid || !currentUser.email) {
+      setShipments([]);
+      setQuotes([]);
+      setInvoices([]);
+      setTickets([]);
+      setLoadError('Sign in with a verified client account to view your records.');
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
     try {
       const [shList, qtList, invList, tckList] = await Promise.all([
-        db.getAll<Shipment>(COLLECTIONS.SHIPMENTS),
-        db.getAll<Quote>(COLLECTIONS.QUOTES),
-        db.getAll<Invoice>(COLLECTIONS.INVOICES),
-        db.getAll<SupportTicket>(COLLECTIONS.SUPPORT_TICKETS),
+        db.getByField<Shipment>(COLLECTIONS.SHIPMENTS, 'customerEmail', currentUser.email),
+        db.getByField<Quote>(COLLECTIONS.QUOTES, 'customerEmail', currentUser.email),
+        db.getByField<Invoice>(COLLECTIONS.INVOICES, 'customerEmail', currentUser.email),
+        db.getByField<SupportTicket>(COLLECTIONS.SUPPORT_TICKETS, 'requesterId', currentUser.uid),
       ]);
       setShipments(shList);
       setQuotes(qtList);
       setInvoices(invList);
       setTickets(tckList);
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error loading customer data:', e);
+      setLoadError('Your client records could not be loaded. Check your account access and connection, then retry.');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadCustomerData();
-    const unsubSh = db.subscribe(COLLECTIONS.SHIPMENTS, loadCustomerData);
-    const unsubQt = db.subscribe(COLLECTIONS.QUOTES, loadCustomerData);
-    const unsubInv = db.subscribe(COLLECTIONS.INVOICES, loadCustomerData);
-    const unsubTck = db.subscribe(COLLECTIONS.SUPPORT_TICKETS, loadCustomerData);
-    return () => {
-      unsubSh();
-      unsubQt();
-      unsubInv();
-      unsubTck();
-    };
-  }, []);
+    void loadCustomerData();
+  }, [currentUser?.uid, currentUser?.email]);
 
   const handleAcceptQuote = async (quoteId: string) => {
     try {
@@ -92,24 +98,33 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) =>
 
   const handleCreateTicket = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!ticketSubject.trim() || !ticketDescription.trim()) return;
+    if (!currentUser || !userProfile || !ticketSubject.trim() || !ticketDescription.trim()) return;
+    const now = new Date().toISOString();
     try {
-      await db.createSupportTicket({
-        requesterName: ticketCustomerName.trim(),
+      await db.add<SupportTicket>(COLLECTIONS.SUPPORT_TICKETS, {
+        id: 'ticket_' + currentUser.uid + '_' + Date.now(),
+        ticketNumber: 'KCC-SUP-' + Date.now().toString().slice(-8),
+        requesterName: userProfile.fullName,
         requesterRole: 'CUSTOMER',
+        requesterId: currentUser.uid,
         subject: ticketSubject.trim(),
         category: ticketCategory,
         description: ticketDescription.trim(),
         relatedShipmentNumber: ticketShipmentNumber.trim() || undefined,
+        status: 'OPEN',
         urgency: 'NORMAL',
+        createdAt: now,
+        updatedAt: now,
+        messages: [],
       });
       setShowNewTicketModal(false);
       setTicketSubject('');
       setTicketDescription('');
       setTicketShipmentNumber('');
-      loadCustomerData();
-    } catch (err) {
+      await loadCustomerData();
+    } catch (err: any) {
       console.error(err);
+      setLoadError('Your support request could not be saved. Please try again.');
     }
   };
 
@@ -123,9 +138,9 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) =>
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 text-xs text-cyan-400 font-mono mb-1">
-              <span>CUSTOMER CARGO PORTAL</span>
+              <span>CLIENT CARGO PORTAL</span>
               <span>•</span>
-              <span className="text-slate-400">Direct Firestore Operations</span>
+              <span className="text-slate-400">{userProfile?.companyName || userProfile?.fullName || 'Secure client account'}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold font-['Poppins'] text-white">
               Customer Consignment Desk
@@ -133,6 +148,7 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) =>
           </div>
 
           <div className="flex items-center gap-3">
+            <button onClick={() => void loadCustomerData()} className="px-3 py-2.5 rounded-xl bg-slate-900 text-slate-200 border border-slate-700 text-xs font-medium flex items-center gap-2"><RefreshCw className="h-3.5 w-3.5" />Refresh</button>
             <button
               onClick={() => setActiveTab('new-booking')}
               className="px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-blue-600/20 active:scale-95 transition-all"
@@ -207,6 +223,8 @@ export const CustomerPortal: React.FC<CustomerPortalProps> = ({ onNavigate }) =>
           </button>
         </div>
       </div>
+
+      {loadError && <div role="alert" className="mx-auto mt-5 max-w-7xl px-4 sm:px-6 lg:px-8"><div className="flex items-center justify-between gap-4 rounded-xl border border-amber-500/30 bg-amber-950/30 p-4 text-sm text-amber-100"><span>{loadError}</span><button onClick={() => void loadCustomerData()} className="shrink-0 underline">Retry</button></div></div>}
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
