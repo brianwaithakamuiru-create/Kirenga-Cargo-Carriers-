@@ -348,7 +348,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithAdminPin = async (pin: string): Promise<UserProfile> => {
-    if (!/^\\d{5}$/.test(pin)) {
+    if (!/^\d{5}$/.test(pin)) {
       throw new Error('Enter the five-digit administrator PIN.');
     }
 
