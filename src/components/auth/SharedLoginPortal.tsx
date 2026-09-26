@@ -107,7 +107,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
     e.preventDefault();
     setError(null);
 
-    const pin = adminPin.replace(/\\D/g, '').slice(0, 5);
+    const pin = adminPin.replace(/\D/g, '').slice(0, 5);
     if (!/^\\d{5}$/.test(pin)) {
       setError('Enter the five-digit administrator PIN.');
       return;
@@ -116,10 +116,6 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
     setLoading(true);
     try {
       const profile = await signInWithAdminPin(pin);
-      if (profile.mustChangePassword) {
-        onNavigate('change-password');
-        return;
-      }
       onNavigate('admin');
     } catch (err: any) {
       setError(err.message || 'Administrator PIN sign-in failed. Please try again.');
@@ -313,7 +309,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                     pattern="[0-9]{5}"
                     maxLength={5}
                     value={adminPin}
-                    onChange={(e) => setAdminPin(e.target.value.replace(/\\D/g, '').slice(0, 5))}
+                    onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
                     placeholder="Enter 5-digit PIN"
                     autoComplete="one-time-code"
                     className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-mono tracking-[0.35em]"
