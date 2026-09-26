@@ -176,7 +176,7 @@ const AppContent: React.FC = () => {
         <LoadingScreen
           onComplete={() => setAppLoaded(true)}
           message="Preparing your logistics experience..."
-          minDurationMs={1100}
+          minDurationMs={350}
         />
       )}
 
