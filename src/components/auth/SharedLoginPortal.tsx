@@ -88,7 +88,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
       const profile = await signIn(cleanIdentifier, password, rememberMe, expectedRole);
 
       // Administrator authentication is intentionally two-step:
-      // Firebase email/password -> role verification -> backend PIN verification.
+      // System password -> role verification -> secure PIN verification.
       if ((profile.role || '').toLowerCase() === 'admin') {
         setAdminPin('');
         setAdminPinStage(true);
@@ -111,7 +111,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
         onNavigate('home');
       }
     } catch (err: any) {
-      setError(err.message || 'Authentication failed. Please verify your credentials.');
+      setError(err.message || 'Login failed. Please verify your credentials.');
     } finally {
       setLoading(false);
     }
@@ -256,7 +256,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
             <span>Back to Public Website</span>
           </button>
           <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">
-            Secured via Firebase
+            System-controlled administrator access
           </span>
         </div>
 
