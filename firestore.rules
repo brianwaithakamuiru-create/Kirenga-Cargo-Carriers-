@@ -209,7 +209,7 @@ service cloud.firestore {
         || (isOwner(userId)
             && request.auth.token.email_verified == true
             && request.resource.data.keys().hasOnly([
-              'id', 'uid', 'fullName', 'email', 'role', 'status', 'customerId',
+              'id', 'uid', 'fullName', 'username', 'email', 'role', 'status', 'customerId',
               'mustChangePassword', 'createdAt', 'updatedAt'
             ])
             && request.resource.data.keys().hasAll([
@@ -223,6 +223,7 @@ service cloud.firestore {
             && request.resource.data.status == 'ACTIVE'
             && request.resource.data.mustChangePassword == false
             && request.resource.data.email == request.auth.token.email
+            && (!('username' in request.resource.data) || request.resource.data.username is string && request.resource.data.username.size() <= 80)
             && stringWithin(request.resource.data.fullName, 120)
             && hasValidTimestamps());
 
