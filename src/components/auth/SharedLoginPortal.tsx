@@ -28,7 +28,7 @@ interface SharedLoginPortalProps {
 }
 
 export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
-  const { signIn, sendPasswordReset } = useAuth();
+  const { signIn, signInWithGoogle, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -93,6 +93,23 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleAdminSignIn = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const profile = await signInWithGoogle();
+      if (profile.mustChangePassword) {
+        onNavigate('change-password');
+        return;
+      }
+      onNavigate('admin');
+    } catch (err: any) {
+      setError(err.message || 'Google sign-in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -325,6 +342,28 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
               )}
             </button>
           </form>
+          {emailOrUsername.trim().toLowerCase() === 'kirengacargo@gmail.com' && (
+            <div className="mt-5">
+              <div className="flex items-center gap-3 mb-4 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
+                <span className="h-px flex-1 bg-slate-800" />
+                <span>Administrator sign-in</span>
+                <span className="h-px flex-1 bg-slate-800" />
+              </div>
+              <button
+                type="button"
+                onClick={handleGoogleAdminSignIn}
+                disabled={loading}
+                className="w-full py-3 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
+              >
+                <span aria-hidden="true" className="text-lg font-bold text-blue-600">G</span>
+                <span>{loading ? 'Connecting to Google…' : 'Continue with Google'}</span>
+              </button>
+              <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
+                Use the verified Google account for Kirenga Cargo administration.
+              </p>
+            </div>
+          )}
+
 
           {/* Contact Administrator Link */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-col items-center gap-2">
