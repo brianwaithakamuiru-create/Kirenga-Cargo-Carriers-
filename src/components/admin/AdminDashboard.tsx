@@ -4,6 +4,7 @@ import {
   Users,
   Compass,
   Briefcase,
+  Building2,
   Truck,
   Package,
   Route as RouteIcon,
@@ -57,6 +58,7 @@ import {
 } from '../../types';
 import { EmptyState } from '../common/EmptyState';
 import { WorkforceManagement } from './WorkforceManagement';
+import { BranchManagement } from './BranchManagement';
 import { AdminSettings } from './AdminSettings';
 import { AdminSecurity } from './AdminSecurity';
 import { WebsiteManagement } from './WebsiteManagement';
@@ -86,6 +88,7 @@ export type AdminNavKey =
   | 'finance'
   | 'documents'
   | 'routes'
+  | 'branches'
   | 'reports'
   | 'notifications'
   | 'website'
@@ -115,6 +118,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     if (clean === 'finance') return 'finance';
     if (clean === 'documents') return 'documents';
     if (clean === 'routes') return 'routes';
+    if (clean === 'branches') return 'branches';
     if (clean === 'reports') return 'reports';
     if (clean === 'notifications') return 'notifications';
     if (clean === 'website') return 'website';
@@ -572,6 +576,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     { key: 'finance', label: 'Finance', icon: DollarSign, badge: unpaidInvoices.length },
     { key: 'documents', label: 'Documents', icon: FileText, badge: expiringDocs.length },
     { key: 'routes', label: 'Routes', icon: RouteIcon },
+    { key: 'branches', label: 'Branches & Offices', icon: Building2 },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
     { key: 'notifications', label: 'Notifications', icon: Bell, badge: pendingBookings.length },
     { key: 'website', label: 'Website Control', icon: Globe },
@@ -1375,6 +1380,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         {activeNav === 'routes' && (
           <OperationsRoutes initialSubTab="routes" onRefreshStats={loadAllData} />
         )}
+
+        {/* ============================================================
+            SECTION: COMPANY BRANCHES
+            ============================================================ */}
+        {activeNav === 'branches' && <BranchManagement />}
 
         {/* ============================================================
             SECTION: REPORTS
