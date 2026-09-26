@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { AnimationProvider } from './context/AnimationContext';
-import { LoadingScreen } from './components/common/LoadingScreen';
 import { SessionLockScreen } from './components/auth/SessionLockScreen';
 import { SharedLoginPortal } from './components/auth/SharedLoginPortal';
 import { ChangePasswordScreen } from './components/auth/ChangePasswordScreen';
@@ -28,7 +27,7 @@ import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Lock, Headphones, Phone
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>('home');
-  const [appLoaded, setAppLoaded] = useState<boolean>(false);
+  const [appLoaded] = useState<boolean>(true);
   const { currentUser, userProfile, role, signOut, isSessionLocked, mustChangePassword } = useAuth();
 
   // Handle URL hash and path routing (e.g. #/login, #/admin, #/driver, #/staff, #/change-password)
@@ -80,7 +79,7 @@ const AppContent: React.FC = () => {
   const navigateTo = (view: string) => {
     setCurrentView(view);
     window.location.hash = `/${view}`;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   // Check account deactivation / suspension / lockout status across all portals
@@ -171,15 +170,6 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#060B18] text-[#F8FAFC] selection:bg-cyan-500/30 selection:text-cyan-200">
-      {/* Animated Loading Screen on First Visit */}
-      {!appLoaded && (
-        <LoadingScreen
-          onComplete={() => setAppLoaded(true)}
-          message="Preparing your logistics experience..."
-          minDurationMs={350}
-        />
-      )}
-
       {/* Inactivity Screen Lock */}
       {isSessionLocked && <SessionLockScreen />}
 
