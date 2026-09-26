@@ -144,11 +144,19 @@ export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate 
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Corridor Route</span>
-            <span className="text-white font-medium">{createdBooking.pickupCountry} → {createdBooking.deliveryCountry}</span>
+            <span className="text-white font-medium text-right">{createdBooking.pickupLocation}, {createdBooking.pickupCountry} → {createdBooking.deliveryLocation}, {createdBooking.deliveryCountry}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Cargo Particulars</span>
             <span className="text-white font-medium">{createdBooking.cargoType} ({createdBooking.weightKg.toLocaleString()} kg)</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400">Cargo Description</span>
+            <span className="text-white font-medium text-right">{createdBooking.cargoDescription}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400">Quantity / Loading Date</span>
+            <span className="text-white font-medium">{createdBooking.quantity} · {createdBooking.pickupDate}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Booking Status</span>
