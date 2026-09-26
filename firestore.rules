@@ -435,6 +435,29 @@ service cloud.firestore {
       allow write: if isAdmin() && hasValidTimestamps();
     }
 
+    match /workplacePermissions/{userId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly([
+          'id', 'userId', 'staffCommands', 'driverCommands', 'adminCommands',
+          'createdAt', 'updatedAt', 'updatedBy'
+        ])
+        && request.resource.data.id == userId
+        && request.resource.data.userId == userId
+        && request.resource.data.createdAt is string
+        && request.resource.data.updatedAt is string
+        && (!('staffCommands' in request.resource.data)
+          || request.resource.data.staffCommands is list
+          && request.resource.data.staffCommands.size() <= 64)
+        && (!('driverCommands' in request.resource.data)
+          || request.resource.data.driverCommands is list
+          && request.resource.data.driverCommands.size() <= 64)
+        && (!('adminCommands' in request.resource.data)
+          || request.resource.data.adminCommands is list
+          && request.resource.data.adminCommands.size() <= 64);
+      allow delete: if isAdmin();
+    }
+
     match /companySettings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
