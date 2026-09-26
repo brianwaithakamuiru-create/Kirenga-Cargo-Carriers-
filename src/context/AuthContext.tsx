@@ -369,10 +369,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const signInWithGoogle = async (): Promise<UserProfile> => {
     const provider = new GoogleAuthProvider();
-    provider.setCustomParameters({
-      login_hint: 'kirengacargo@gmail.com',
-      prompt: 'select_account',
-    });
+    provider.setCustomParameters({ prompt: 'select_account' });
 
     await setPersistence(auth, browserLocalPersistence);
     persistenceRef.current = true;
@@ -393,11 +390,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error(err.message || 'Google sign-in failed. Please try again.');
     }
 
-    if (authUser.email?.toLowerCase() !== 'kirengacargo@gmail.com') {
+    const authorizedAdminEmails = ['kirengacargo@gmail.com', 'brianwaithakamuiru@gmail.com'];
+    if (!authUser.email || !authorizedAdminEmails.includes(authUser.email.toLowerCase())) {
       await firebaseSignOut(auth);
       setCurrentUser(null);
       setUserProfile(null);
-      throw new Error('Use the Google account registered for the Kirenga Cargo administrator.');
+      throw new Error('Use kirengacargo@gmail.com or brianwaithakamuiru@gmail.com to access the administrator workplace.');
     }
 
     if (!authUser.emailVerified) {
