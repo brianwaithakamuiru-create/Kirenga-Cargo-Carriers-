@@ -29,12 +29,9 @@ service cloud.firestore {
     }
 
     function isAdminBootstrapEmail() {
-      return isSignedIn() && (
-        request.auth.token.email == 'kirengacargo@gmail.com' ||
-        request.auth.token.email == 'kirengacargocariers@gmail.com' ||
-        request.auth.token.email == 'kirengacarogocariers@gmail.com' ||
-        request.auth.token.email == 'brianwaithakamuiru@gmail.com'
-      );
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email == 'kirengacargo@gmail.com';
     }
 
     function isAdmin() {
@@ -66,7 +63,113 @@ service cloud.firestore {
 
     function hasValidTimestamps() {
       return request.resource.data.createdAt is string
-          && request.resource.data.updatedAt is string;
+          && request.resource.data.createdAt.size() <= 40
+          && request.resource.data.updatedAt is string
+          && request.resource.data.updatedAt.size() <= 40;
+    }
+
+    function stringWithin(value, maxLength) {
+      return value is string && value.size() > 0 && value.size() <= maxLength;
+    }
+
+    function isValidBooking(bookingId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'id', 'bookingReference', 'status', 'fullName', 'phone', 'email',
+          'pickupCountry', 'pickupLocation', 'deliveryCountry', 'deliveryLocation',
+          'cargoType', 'cargoDescription', 'weightKg', 'quantity', 'dimensions',
+          'pickupDate', 'deliveryRequirements', 'specialInstructions',
+          'documentName', 'documentData', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasAll([
+          'id', 'bookingReference', 'status', 'fullName', 'phone', 'email',
+          'pickupCountry', 'pickupLocation', 'deliveryCountry', 'deliveryLocation',
+          'cargoType', 'cargoDescription', 'weightKg', 'quantity',
+          'createdAt', 'updatedAt'
+        ])
+        && d.id == bookingId
+        && d.status == 'PENDING'
+        && stringWithin(d.fullName, 120)
+        && stringWithin(d.phone, 40)
+        && stringWithin(d.email, 254)
+        && d.email.matches('.*@.*')
+        && stringWithin(d.pickupCountry, 80)
+        && stringWithin(d.pickupLocation, 240)
+        && stringWithin(d.deliveryCountry, 80)
+        && stringWithin(d.deliveryLocation, 240)
+        && stringWithin(d.cargoType, 80)
+        && stringWithin(d.cargoDescription, 1000)
+        && d.weightKg is number && d.weightKg > 0 && d.weightKg <= 100000
+        && d.quantity is int && d.quantity > 0 && d.quantity <= 10000
+        && (!('dimensions' in d) || d.dimensions is string && d.dimensions.size() <= 120)
+        && (!('pickupDate' in d) || d.pickupDate is string && d.pickupDate.size() <= 40)
+        && (!('deliveryRequirements' in d) || d.deliveryRequirements is string && d.deliveryRequirements.size() <= 1000)
+        && (!('specialInstructions' in d) || d.specialInstructions is string && d.specialInstructions.size() <= 1000)
+        && (!('documentName' in d) || d.documentName is string && d.documentName.size() <= 120)
+        && (!('documentData' in d) || d.documentData is string && d.documentData.size() <= 700000)
+        && hasValidTimestamps();
+    }
+
+    function isValidQuote(quoteId) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'id', 'quoteReference', 'customerName', 'customerEmail', 'customerPhone',
+          'origin', 'destination', 'cargoType', 'weightKg', 'transportCost',
+          'additionalCharges', 'taxes', 'total', 'currency', 'validUntil',
+          'terms', 'status', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasAll([
+          'id', 'quoteReference', 'customerName', 'customerEmail', 'customerPhone',
+          'origin', 'destination', 'cargoType', 'weightKg', 'transportCost',
+          'additionalCharges', 'taxes', 'total', 'currency', 'validUntil',
+          'terms', 'status', 'createdAt', 'updatedAt'
+        ])
+        && d.id == quoteId
+        && d.status == 'SENT'
+        && stringWithin(d.quoteReference, 80)
+        && stringWithin(d.customerName, 120)
+        && stringWithin(d.customerEmail, 254)
+        && d.customerEmail.matches('.*@.*')
+        && stringWithin(d.customerPhone, 40)
+        && stringWithin(d.origin, 240)
+        && stringWithin(d.destination, 240)
+        && stringWithin(d.cargoType, 80)
+        && d.weightKg is number && d.weightKg > 0 && d.weightKg <= 100000
+        && d.transportCost is number && d.transportCost >= 0
+        && d.additionalCharges is number && d.additionalCharges >= 0
+        && d.taxes is number && d.taxes >= 0
+        && d.total is number && d.total >= 0
+        && stringWithin(d.currency, 8)
+        && stringWithin(d.validUntil, 40)
+        && stringWithin(d.terms, 1000)
+        && hasValidTimestamps();
+    }
+
+    function isValidPublicTracking(trackingNumber) {
+      let d = request.resource.data;
+      return d.keys().hasOnly([
+          'id', 'shipmentNumber', 'status', 'originCountry', 'originCity',
+          'destinationCountry', 'destinationCity', 'cargoType', 'weightKg',
+          'pickupDate', 'expectedDelivery', 'actualDelivery', 'createdAt', 'updatedAt'
+        ])
+        && d.keys().hasAll([
+          'id', 'shipmentNumber', 'status', 'originCountry', 'originCity',
+          'destinationCountry', 'destinationCity', 'cargoType', 'weightKg',
+          'createdAt', 'updatedAt'
+        ])
+        && d.id == trackingNumber
+        && d.shipmentNumber == trackingNumber
+        && stringWithin(d.status, 40)
+        && stringWithin(d.originCountry, 80)
+        && stringWithin(d.originCity, 120)
+        && stringWithin(d.destinationCountry, 80)
+        && stringWithin(d.destinationCity, 120)
+        && stringWithin(d.cargoType, 80)
+        && d.weightKg is number && d.weightKg >= 0 && d.weightKg <= 100000
+        && (!('pickupDate' in d) || d.pickupDate is string && d.pickupDate.size() <= 40)
+        && (!('expectedDelivery' in d) || d.expectedDelivery is string && d.expectedDelivery.size() <= 40)
+        && (!('actualDelivery' in d) || d.actualDelivery is string && d.actualDelivery.size() <= 40)
+        && hasValidTimestamps();
     }
 
     // Default: Deny all by default
@@ -83,7 +186,7 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       // Creation: Only Admin, or the initial bootstrap admin account
-      allow create: if (isAdmin() && hasValidTimestamps()
+      allow create: if (isAdmin() && userDocExists() && hasValidTimestamps()
             && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN'
                 || request.resource.data.role == 'staff' || request.resource.data.role == 'STAFF'
                 || request.resource.data.role == 'worker' || request.resource.data.role == 'WORKER'
@@ -92,8 +195,9 @@ service cloud.firestore {
             && request.auth.uid == userId
             && isAdminBootstrapEmail()
             && !userDocExists()
-            && (request.resource.data.email == 'kirengacargoc@gmail.com' ||
-            request.resource.data.email == 'kirengacargocariers@gmail.com' || request.resource.data.email == 'kirengacarogocariers@gmail.com' || request.resource.data.email == 'brianwaithakamuiru@gmail.com')
+            && request.auth.token.email_verified == true
+            && request.resource.data.email == request.auth.token.email
+            && isAdminBootstrapEmail()
             && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN')
             && (request.resource.data.status == 'active' || request.resource.data.status == 'ACTIVE')
             && hasValidTimestamps());
@@ -164,15 +268,19 @@ service cloud.firestore {
     }
 
     match /bookings/{bookingId} {
-      allow read: if true;
-      allow create: if hasValidTimestamps();
-      allow update, delete: if (isAdmin() || isWorker()) && hasValidTimestamps();
+      // Booking records contain customer contact details and are staff-only.
+      allow read: if isSignedIn() && isActive() && (isAdmin() || isWorker());
+      allow create: if isValidBooking(bookingId);
+      allow update: if isSignedIn() && isActive() && (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow delete: if isAdmin();
     }
 
     match /quotes/{quoteId} {
-      allow read: if true;
-      allow create: if hasValidTimestamps();
-      allow update, delete: if (isAdmin() || isWorker()) && hasValidTimestamps();
+      // Quotes contain customer contact details and are staff-only.
+      allow read: if isSignedIn() && isActive() && (isAdmin() || isWorker());
+      allow create: if isValidQuote(quoteId);
+      allow update: if isSignedIn() && isActive() && (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow delete: if isAdmin();
     }
 
     match /quotations/{quotationId} {
@@ -241,13 +349,25 @@ service cloud.firestore {
     // ----------------------------------------------------
     
     match /cargo/{cargoId} {
-      allow read: if true; // Public tracking
-      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow read: if isSignedIn() && isActive() && (isAdmin() || isWorker());
+      allow create, update: if isSignedIn() && isActive() && (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow delete: if isAdmin();
     }
 
     match /shipments/{shipmentId} {
-      allow read: if true; // Public tracking
-      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow read: if isSignedIn() && isActive() && (isAdmin() || isWorker() || isDriver());
+      allow create, update: if isSignedIn() && isActive() && (isAdmin() || isWorker()) && hasValidTimestamps();
+      allow delete: if isAdmin();
+    }
+
+    match /publicTracking/{trackingNumber} {
+      // Public clients can fetch one sanitized record by exact waybill; collection listing is disabled.
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if isSignedIn() && isActive()
+        && (isAdmin() || isWorker() || isDriver())
+        && isValidPublicTracking(trackingNumber);
+      allow delete: if isAdmin();
     }
 
     // ----------------------------------------------------
