@@ -17,6 +17,7 @@ import {
   Globe2,
   Headphones,
   Send,
+  UserPlus,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firestoreService';
@@ -28,12 +29,16 @@ interface SharedLoginPortalProps {
 }
 
 export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
-  const { signIn, signInWithGoogle, sendPasswordReset } = useAuth();
+  const { signIn, signInWithGoogle, signInWithAdminProvider, registerCustomer, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
+  const [selectedPortal, setSelectedPortal] = useState<'client' | 'driver' | 'staff' | 'admin'>('client');
+  const [customerRegistration, setCustomerRegistration] = useState(false);
+  const [customerName, setCustomerName] = useState('');
+  const [customerRegistrationNotice, setCustomerRegistrationNotice] = useState<string | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,7 +77,8 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
     setLoading(true);
     try {
-      const profile = await signIn(cleanIdentifier, password, rememberMe);
+      const expectedRole = selectedPortal === 'client' ? 'customer' : selectedPortal;
+      const profile = await signIn(cleanIdentifier, password, rememberMe, expectedRole);
 
       // Check temporary password flow first
       if (profile.mustChangePassword) {
@@ -98,18 +104,37 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
     }
   };
 
-  const handleGoogleAdminSignIn = async () => {
+  const handleAdminProviderSignIn = async (provider: 'google.com' | 'apple.com' | 'microsoft.com') => {
     setError(null);
     setLoading(true);
     try {
-      const profile = await signInWithGoogle();
+      const profile = provider === 'google.com'
+        ? await signInWithGoogle()
+        : await signInWithAdminProvider(provider);
       if (profile.mustChangePassword) {
         onNavigate('change-password');
         return;
       }
       onNavigate('admin');
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed. Please try again.');
+      setError(err.message || 'Administrator sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCustomerRegistration = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError(null);
+    setCustomerRegistrationNotice(null);
+    setLoading(true);
+    try {
+      await registerCustomer(customerName, emailOrUsername, password);
+      setCustomerRegistrationNotice('Account created. Verify the link sent to your email, then sign in here.');
+      setCustomerRegistration(false);
+      setPassword('');
+    } catch (err: any) {
+      setError(err.message || 'Could not create your client account.');
     } finally {
       setLoading(false);
     }
@@ -229,12 +254,35 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
           <div className="text-center mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-white font-['Poppins'] tracking-tight">
-              Secure Workforce Portal
+              Kirenga Cargo Portal
             </h1>
             <p className="text-slate-400 text-xs mt-2 leading-relaxed">
-              Authorized access for Central Administrators, Commercial Drivers, and Operations Staff.
+              One sign-in for clients, drivers, staff, and administrators.
             </p>
           </div>
+
+
+          <div className="mb-6 grid grid-cols-2 gap-2" role="group" aria-label="Choose your portal">
+            {[
+              { id: 'client', label: 'Client' },
+              { id: 'driver', label: 'Driver' },
+              { id: 'staff', label: 'Staff' },
+              { id: 'admin', label: 'Administrator' },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => { setSelectedPortal(item.id as typeof selectedPortal); setCustomerRegistration(false); setError(null); setCustomerRegistrationNotice(null); }}
+                aria-pressed={selectedPortal === item.id}
+                className={selectedPortal === item.id
+                  ? 'rounded-xl border border-cyan-400 bg-cyan-950/60 px-3 py-2.5 text-xs font-bold text-cyan-200'
+                  : 'rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 text-xs font-semibold text-slate-400 hover:text-white'}
+              >{item.label}</button>
+            ))}
+          </div>
+          {customerRegistrationNotice && (
+            <div role="status" className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-950/30 p-3 text-xs text-emerald-200">{customerRegistrationNotice}</div>
+          )}
 
           {/* Validation / Error Banner */}
           {error && (
@@ -244,7 +292,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {!customerRegistration && <form onSubmit={handleSubmit} className="space-y-5">
             {/* Email or Username */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
@@ -341,8 +389,25 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                 </>
               )}
             </button>
-          </form>
-          {emailOrUsername.trim().toLowerCase() === 'kirengacargo@gmail.com' && (
+          </form>}
+          {selectedPortal === 'client' && customerRegistration && (
+            <form onSubmit={handleCustomerRegistration} className="space-y-4">
+              <label className="block text-xs font-medium text-slate-300">Full name
+                <input value={customerName} onChange={(event) => setCustomerName(event.target.value)} required maxLength={120} autoComplete="name" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-3 text-sm text-white" />
+              </label>
+              <label className="block text-xs font-medium text-slate-300">Email address
+                <input type="email" value={emailOrUsername} onChange={(event) => setEmailOrUsername(event.target.value)} required autoComplete="email" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-3 text-sm text-white" />
+              </label>
+              <label className="block text-xs font-medium text-slate-300">Password (at least 8 characters)
+                <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} required minLength={8} autoComplete="new-password" className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 px-3.5 py-3 text-sm text-white" />
+              </label>
+              <button type="submit" disabled={loading} className="w-full rounded-xl bg-cyan-600 px-5 py-3.5 text-sm font-bold text-white disabled:opacity-60">
+                {loading ? 'Creating client account…' : 'Create client account'}
+              </button>
+              <button type="button" onClick={() => setCustomerRegistration(false)} className="w-full text-xs text-slate-400 hover:text-white">Back to sign in</button>
+            </form>
+          )}
+          {selectedPortal === 'admin' && !customerRegistration && (
             <div className="mt-5">
               <div className="flex items-center gap-3 mb-4 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
                 <span className="h-px flex-1 bg-slate-800" />
@@ -351,20 +416,32 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
               </div>
               <button
                 type="button"
-                onClick={handleGoogleAdminSignIn}
+                onClick={() => void handleAdminProviderSignIn('google.com')}
                 disabled={loading}
                 className="w-full py-3 px-5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-semibold text-sm flex items-center justify-center gap-3 transition-colors disabled:opacity-60"
               >
                 <span aria-hidden="true" className="text-lg font-bold text-blue-600">G</span>
-                <span>{loading ? 'Connecting to Google…' : 'Continue with Google'}</span>
+                <span>{loading ? 'Connecting…' : 'Continue with Google'}</span>
               </button>
               <p className="mt-2 text-center text-[11px] leading-relaxed text-slate-500">
-                Use the verified Google account for Kirenga Cargo administration.
+                Use an identity already linked to the active administrator account.
               </p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => void handleAdminProviderSignIn('apple.com')} disabled={loading} className="rounded-xl border border-slate-700 bg-black px-3 py-3 text-sm font-semibold text-white disabled:opacity-60">Continue with Apple</button>
+                <button type="button" onClick={() => void handleAdminProviderSignIn('microsoft.com')} disabled={loading} className="rounded-xl border border-slate-700 bg-white px-3 py-3 text-sm font-semibold text-slate-900 disabled:opacity-60">Continue with Microsoft</button>
+              </div>
             </div>
           )}
 
 
+          {selectedPortal === 'client' && !customerRegistration && (
+            <button type="button" onClick={() => { setCustomerRegistration(true); setError(null); }} className="mt-4 w-full rounded-xl border border-cyan-500/30 bg-cyan-950/20 px-4 py-3 text-xs font-semibold text-cyan-200 hover:bg-cyan-950/40">
+              <UserPlus className="mr-2 inline h-4 w-4" />Create a client account
+            </button>
+          )}
+          {(selectedPortal === 'driver' || selectedPortal === 'staff') && (
+            <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-500">Your account and temporary password are provided by a Kirenga Cargo administrator.</p>
+          )}
           {/* Contact Administrator Link */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-col items-center gap-2">
             <button
