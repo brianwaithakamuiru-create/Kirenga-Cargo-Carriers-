@@ -19,6 +19,7 @@ import {
   unlink,
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
+import { signInWithCustomToken } from 'firebase/auth';
 import { db } from '../lib/firestoreService';
 import { UserProfile, SystemSettings } from '../types';
 
@@ -207,10 +208,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const isAdminEmail = normalizedEmail === 'kirengacargo@gmail.com';
 
     let authUser: User;
-    try {
-      const cred = await signInWithEmailAndPassword(auth, emailToUse, pass);
-      authUser = cred.user;
-    } catch (authErr: any) {
+
+    // Administrator passwords are controlled by the Kirenga Cargo system,
+    // not Firebase Authentication. The trusted API verifies the system password
+    // and returns a short-lived Firebase custom session so existing Firestore
+    // workplace permissions continue to work.
+    if (isAdminEmail && expectedRole === 'admin') {
+      try {
+        const response = await fetch('/api/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: emailToUse, password: pass }),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || typeof result.customToken !== 'string') {
+          throw new Error(result.error || 'Incorrect administrator credentials.');
+        }
+        const cred = await signInWithCustomToken(auth, result.customToken);
+        authUser = cred.user;
+      } catch (systemErr: any) {
+        throw new Error(systemErr.message || 'Administrator system login failed.');
+      }
+    } else {
+      try {
+        const cred = await signInWithEmailAndPassword(auth, emailToUse, pass);
+        authUser = cred.user;
+      } catch (authErr: any) {
       // Do not query the private users collection before authentication succeeds.
       // This prevents account enumeration and keeps the fast login path database-light.
 
@@ -250,6 +273,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         throw new Error('Too many failed attempts. Access is temporarily locked. Please try again shortly or reset password.');
       }
       throw new Error(authErr.message || 'Failed to authenticate. Please check your credentials.');
+    }
     }
 
     // Retrieve Firestore Profile
