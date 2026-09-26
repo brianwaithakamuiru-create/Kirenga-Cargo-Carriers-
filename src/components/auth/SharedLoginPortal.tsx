@@ -252,7 +252,11 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
               <button
                 key={item.id}
                 type="button"
-                onClick={() => { setSelectedPortal(item.id as typeof selectedPortal); setError(null); }}
+                onClick={() => {
+                  setSelectedPortal(item.id as typeof selectedPortal);
+                  if (item.id === 'admin') setEmailOrUsername('kirengacargo@gmail.com');
+                  setError(null);
+                }}
                 aria-pressed={selectedPortal === item.id}
                 className={selectedPortal === item.id
                   ? 'rounded-xl border border-cyan-400 bg-cyan-950/60 px-3 py-2.5 text-xs font-bold text-cyan-200'
@@ -261,6 +265,12 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
             ))}
           </div>
 
+
+          {selectedPortal === 'admin' && (
+            <p className="mb-4 -mt-3 text-center text-xs text-cyan-200">
+              Admin account: <strong>kirengacargo@gmail.com</strong>
+            </p>
+          )}
 
           {/* Validation / Error Banner */}
           {error && (
@@ -284,7 +294,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                   type="text"
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
-                  placeholder="Enter your registered email address"
+                  placeholder={selectedPortal === 'admin' ? 'kirengacargo@gmail.com' : 'Enter your registered email address'}
                   className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-sans"
                   autoComplete="username"
                   required
