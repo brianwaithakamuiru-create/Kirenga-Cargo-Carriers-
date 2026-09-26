@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   sendEmailVerification,
   updatePassword as firebaseUpdatePassword,
+  updateProfile as firebaseUpdateAuthProfile,
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
@@ -469,7 +470,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
     try {
-      await updateProfile(credential.user, { displayName: cleanName });
+      await firebaseUpdateAuthProfile(credential.user, { displayName: cleanName });
       await sendEmailVerification(credential.user);
     } finally {
       await firebaseSignOut(auth);
