@@ -1,4 +1,4 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
+import { createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { cert, getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -27,91 +27,149 @@ function safeEqual(a: string, b: string) {
   return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 }
 
+function getBearerToken(request: Request) {
+  const authorization = getHeader(request, 'authorization') || getHeader(request, 'Authorization');
+  if (!authorization) return null;
+  const match = authorization.match(/^Bearer\\s+(.+)$/i);
+  return match?.[1] || null;
+}
+
+function verifyScryptPin(pin: string, encodedHash: string) {
+  const parts = encodedHash.split('$');
+  if (parts.length !== 7 || parts[0] !== 'scrypt') return false;
+
+  const n = Number(parts[1]);
+  const r = Number(parts[2]);
+  const p = Number(parts[3]);
+  if (!Number.isInteger(n) || !Number.isInteger(r) || !Number.isInteger(p)) return false;
+
+  try {
+    const salt = Buffer.from(parts[4], 'base64url');
+    const expected = Buffer.from(parts[5], 'base64url');
+    const derived = scryptSync(pin, salt, expected.length, {
+      N: n,
+      r,
+      p,
+      maxmem: 32 * 1024 * 1024,
+    });
+    return expected.length === derived.length && timingSafeEqual(expected, derived);
+  } catch {
+    return false;
+  }
+}
+
+async function writePinAudit(firestore: FirebaseFirestore.Firestore, data: Record<string, unknown>) {
+  try {
+    await firestore.collection('adminPinAudit').add({
+      ...data,
+      createdAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Admin PIN audit write failed:', error);
+  }
+}
+
+
 export default async function handler(request: Request, response: Response) {
   response.setHeader('Cache-Control', 'no-store');
+
   if (request.method !== 'POST') {
     response.setHeader('Allow', 'POST');
     return response.status(405).json({ error: 'Method not allowed.' });
   }
 
   const { pin } = parseBody(request.body);
-  if (typeof pin !== 'string' || !/^\d{5}$/.test(pin)) {
+  if (typeof pin !== 'string' || !/^\\d{5}$/.test(pin)) {
     return response.status(400).json({ error: 'Enter the five-digit administrator PIN.' });
   }
 
-  const configuredPin = process.env.ADMIN_WORKPLACE_PIN;
-  if (!configuredPin || !/^\d{5}$/.test(configuredPin)) {
-    return response.status(503).json({ error: 'Administrator PIN sign-in is not configured on the server. Add ADMIN_WORKPLACE_PIN in Vercel.' });
+  const pinHash = process.env.ADMIN_WORKPLACE_PIN_HASH;
+  if (!pinHash) {
+    console.error('ADMIN_WORKPLACE_PIN_HASH is not configured on the trusted backend.');
+    return response.status(503).json({ error: 'Administrator PIN verification is not configured on the server.' });
+  }
+
+  const bearerToken = getBearerToken(request);
+  if (!bearerToken) {
+    return response.status(401).json({ error: 'Administrator authentication is required.' });
   }
 
   try {
-    // Keep the short PIN protected against rapid guessing. Count failed attempts too.
     const app = getAdminApp();
+    const adminAuth = getAuth(app);
     const firestore = getFirestore(app);
+
+    let decodedToken;
+    try {
+      decodedToken = await adminAuth.verifyIdToken(bearerToken);
+    } catch {
+      return response.status(401).json({ error: 'Administrator authentication is required.' });
+    }
+
+    const profileSnapshot = await firestore.collection('users').doc(decodedToken.uid).get();
+    const profile = profileSnapshot.data();
+    const role = String(profile?.role || '').toLowerCase();
+    const status = String(profile?.status || '').toLowerCase();
+
+    if (role !== 'admin' || status !== 'active') {
+      return response.status(403).json({ error: 'Administrator authorization could not be verified.' });
+    }
+
     const forwardedFor = getHeader(request, 'x-forwarded-for');
     const realIp = getHeader(request, 'x-real-ip');
     const ip = realIp || forwardedFor?.split(',')[0]?.trim() || request.socket?.remoteAddress || 'unknown';
-    const ipHash = createHash('sha256').update(ip).digest('hex');
+    const ipHash = createHash('sha256').update(ip + ':' + decodedToken.uid).digest('hex');
     const rateRef = firestore.collection('adminPinRateLimits').doc(ipHash);
     const now = Date.now();
     const windowMs = 15 * 60 * 1000;
+
     const allowed = await firestore.runTransaction(async (transaction) => {
       const snapshot = await transaction.get(rateRef);
       const data = snapshot.data();
       const windowStart = Number(data?.windowStart || now);
       const attempts = now - windowStart >= windowMs ? 0 : Number(data?.attempts || 0);
+
       if (attempts >= 5) return false;
-      transaction.set(rateRef, { windowStart: attempts === 0 ? now : windowStart, attempts: attempts + 1, expiresAt: new Date(now + windowMs) });
+
+      transaction.set(rateRef, {
+        windowStart: attempts === 0 ? now : windowStart,
+        attempts: attempts + 1,
+        expiresAt: new Date(now + windowMs),
+        uid: decodedToken.uid,
+      });
+
       return true;
     });
-    if (!allowed) return response.status(429).json({ error: 'Too many PIN attempts. Try again in 15 minutes.' });
-    if (!safeEqual(pin, configuredPin)) return response.status(401).json({ error: 'Incorrect administrator PIN.' });
 
-    const adminAuth = getAuth(app);
-    let adminUser;
-    try {
-      adminUser = await adminAuth.getUserByEmail('kirengacargo@gmail.com');
-    } catch (error: any) {
-      if (error?.code !== 'auth/user-not-found') throw error;
-      adminUser = await adminAuth.createUser({
-        email: 'kirengacargo@gmail.com',
-        emailVerified: true,
-        disabled: false,
+    if (!allowed) {
+      await writePinAudit(firestore, {
+        uid: decodedToken.uid,
+        event: 'ADMIN_PIN_RATE_LIMITED',
+        ipHash,
       });
+      return response.status(429).json({ error: 'Too many verification attempts. Please try again later.' });
     }
 
-    const profileSnapshot = await firestore.collection('users').doc(adminUser.uid).get();
-    const profile = profileSnapshot.data();
+    const validPin = verifyScryptPin(pin, pinHash);
 
-    if (!profile) {
-      const now = new Date().toISOString();
-      await firestore.collection('users').doc(adminUser.uid).set({
-        id: adminUser.uid,
-        uid: adminUser.uid,
-        fullName: 'Kirenga Central Administrator',
-        username: 'admin',
-        email: adminUser.email || 'kirengacargo@gmail.com',
-        phone: '',
-        country: 'Kenya',
-        role: 'ADMIN',
-        status: 'ACTIVE',
-        department: 'Administration',
-        employeeId: 'KCC-ADM-001',
-        mustChangePassword: false,
-        failedLoginAttempts: 0,
-        lastLoginAt: now,
-        workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
-        createdAt: now,
-        updatedAt: now,
+    if (!validPin) {
+      await writePinAudit(firestore, {
+        uid: decodedToken.uid,
+        event: 'ADMIN_PIN_FAILED',
+        ipHash,
       });
-    } else if (String(profile.role || '').toLowerCase() !== 'admin' || String(profile.status || '').toLowerCase() !== 'active') {
-      return response.status(403).json({ error: 'The administrator Firebase profile is inactive or does not have the ADMIN role.' });
+      return response.status(401).json({ error: 'Incorrect Admin PIN. Access denied.' });
     }
 
-    const token = await adminAuth.createCustomToken(adminUser.uid, { role: 'admin' });
-    return response.status(200).json({ token });
+    await writePinAudit(firestore, {
+      uid: decodedToken.uid,
+      event: 'ADMIN_PIN_VERIFIED',
+      ipHash,
+    });
+
+    return response.status(200).json({ success: true });
   } catch (error: any) {
-    console.error('Admin PIN sign-in failed:', error);
-    return response.status(503).json({ error: error?.message || 'Administrator PIN sign-in could not be completed.' });
+    console.error('Admin PIN verification failed:', error?.message || 'unknown error');
+    return response.status(503).json({ error: 'Administrator PIN verification could not be completed.' });
   }
 }
