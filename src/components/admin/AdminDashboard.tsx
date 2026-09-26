@@ -5,6 +5,7 @@ import {
   Compass,
   Briefcase,
   Building2,
+  Palette,
   Truck,
   Package,
   Route as RouteIcon,
@@ -70,6 +71,7 @@ import { WarehouseManagement } from './WarehouseManagement';
 import { CentralDocumentManager } from './CentralDocumentManager';
 import { CentralReports } from './CentralReports';
 import { LiveTrackingMap } from './LiveTrackingMap';
+import { WorkplaceAppearanceControl } from './WorkplaceAppearanceControl';
 import { CompanyLogo } from '../common/CompanyLogo';
 
 interface AdminDashboardProps {
@@ -89,6 +91,8 @@ export type AdminNavKey =
   | 'documents'
   | 'routes'
   | 'branches'
+  | 'checkpoints'
+  | 'appearance'
   | 'reports'
   | 'notifications'
   | 'website'
@@ -119,6 +123,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     if (clean === 'documents') return 'documents';
     if (clean === 'routes') return 'routes';
     if (clean === 'branches') return 'branches';
+    if (clean === 'checkpoints') return 'checkpoints';
+    if (clean === 'appearance' || clean === 'permissions') return 'appearance';
+    if (clean === 'warehouse') return 'warehouse';
     if (clean === 'reports') return 'reports';
     if (clean === 'notifications') return 'notifications';
     if (clean === 'website') return 'website';
@@ -541,10 +548,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     { key: 'finance', label: 'Finance', icon: DollarSign, badge: unpaidInvoices.length },
     { key: 'documents', label: 'Documents', icon: FileText, badge: expiringDocs.length },
     { key: 'routes', label: 'Routes', icon: RouteIcon },
+    { key: 'checkpoints', label: 'Checkpoints & Borders', icon: Navigation },
     { key: 'branches', label: 'Branches & Offices', icon: Building2 },
+    { key: 'warehouse', label: 'Warehouse', icon: Layers },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
     { key: 'notifications', label: 'Notifications', icon: Bell, badge: pendingBookings.length },
     { key: 'website', label: 'Website Control', icon: Globe },
+    { key: 'appearance', label: 'Appearance & Permissions', icon: Palette },
     { key: 'settings', label: 'Settings', icon: Settings },
     { key: 'security', label: 'Security', icon: Shield },
   ];
@@ -1354,6 +1364,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         {activeNav === 'routes' && (
           <OperationsRoutes initialSubTab="routes" onRefreshStats={loadAllData} />
         )}
+        {activeNav === 'checkpoints' && (
+          <OperationsRoutes initialSubTab="checkpoints" onRefreshStats={loadAllData} />
+        )}
 
         {/* ============================================================
             SECTION: COMPANY BRANCHES
@@ -1550,6 +1563,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         {/* ============================================================
             SECTION: SETTINGS
             ============================================================ */}
+        {activeNav === 'appearance' && <WorkplaceAppearanceControl />}
         {activeNav === 'settings' && <AdminSettings />}
 
         {/* ============================================================
