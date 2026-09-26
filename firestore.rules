@@ -428,8 +428,8 @@ service cloud.firestore {
     }
 
     match /publicTracking/{trackingNumber} {
-      // Public clients can fetch one sanitized record by exact waybill; collection listing is disabled.
-      allow get: if true;
+      // Shipment tracking is served through the phone-verified server endpoint.
+      allow get: if false;
       allow list: if false;
       allow create, update: if isSignedIn() && isActive()
         && (isAdmin() || isWorker() || isDriver())
