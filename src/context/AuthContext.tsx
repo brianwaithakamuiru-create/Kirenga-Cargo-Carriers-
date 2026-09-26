@@ -336,48 +336,35 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Your account is currently unavailable. Contact the Kirenga Cargo Carriers administrator.');
     }
 
-    // Update local state immediately. These bookkeeping writes are non-critical
-    // to the user's navigation and therefore run in the background.
-    const nowIso = new Date().toISOString();
-    profile.failedLoginAttempts = 0;
-    profile.lastLoginAt = nowIso;
+    // Complete login from the local authenticated profile immediately.
+    // Analytics/bookkeeping are deliberately deferred so they never delay navigation.
     profileCacheRef.current.set(authUser.uid, profile);
     setUserProfile(profile);
     setIsSessionLocked(false);
 
-    void Promise.all([
-      db.updateUserProfile(authUser.uid, {
-        failedLoginAttempts: 0,
-        lastLoginAt: nowIso,
-      }),
-      db.logAudit({
-        actorUid: authUser.uid,
-        actorRole: profile.role || 'USER',
-        action: 'USER_LOGIN',
-        targetUid: authUser.uid,
-        details: `Successful sign-in with role ${profile.role} from ${profile.country || 'East Africa'}`,
-      }),
-    ]).catch((err) => {
-      console.warn('Post-login bookkeeping completed with a non-blocking error:', err);
-    });
+    // Fire-and-forget: do not make dashboard navigation wait for audit writes.
+    void db.logAudit({
+      actorUid: authUser.uid,
+      actorRole: profile.role || 'USER',
+      action: 'USER_LOGIN',
+      targetUid: authUser.uid,
+      details: `Successful sign-in with role ${profile.role}`,
+    }).catch(() => {});
 
     return profile;
   };
 
   // Sign Out
   const signOut = async () => {
-    if (currentUser && userProfile) {
-      try {
-        await db.logAudit({
-          userId: currentUser.uid,
-          userName: userProfile.fullName,
-          action: 'USER_LOGOUT',
-          details: 'Session terminated gracefully by user.',
-        });
-      } catch (e) {
-        // ignore
-      }
-    }
+    // Sign out immediately; audit logging must never block the logout button.
+    const uid = currentUser?.uid;
+    const name = userProfile?.fullName;
+    void (uid && db.logAudit({
+      userId: uid,
+      userName: name || 'User',
+      action: 'USER_LOGOUT',
+      details: 'Session terminated gracefully by user.',
+    }).catch(() => {}));
     await firebaseSignOut(auth);
     setCurrentUser(null);
     setUserProfile(null);
@@ -392,12 +379,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
     await sendPasswordResetEmail(auth, emailToUse);
     if (currentUser) {
-      await db.logAudit({
+      void db.logAudit({
         userId: currentUser.uid,
         userName: userProfile?.fullName || 'User',
         action: 'PASSWORD_RESET_REQUESTED',
         details: `Password reset email dispatched to ${emailToUse}`,
-      });
+      }).catch(() => {});
     }
   };
 
