@@ -25,9 +25,10 @@ import { useBranding } from '../../context/BrandingContext';
 
 interface SharedLoginPortalProps {
   onNavigate: (view: string) => void;
+  initialPortal?: 'driver' | 'staff' | 'admin';
 }
 
-export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
+export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate, initialPortal = 'staff' }) => {
   const { currentUser, userProfile, adminPinVerified, signIn, signInWithGoogle, signInWithAdminProvider, signInWithAdminPin, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
@@ -36,7 +37,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
   const [adminPinStage, setAdminPinStage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [selectedPortal, setSelectedPortal] = useState<'driver' | 'staff' | 'admin'>('staff');
+  const [selectedPortal, setSelectedPortal] = useState<'driver' | 'staff' | 'admin'>(initialPortal);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
