@@ -475,7 +475,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                 <Mail className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                 <div className="text-xs">
                   <div className="text-slate-400 font-mono text-[10px]">ADMINISTRATOR EMAIL</div>
-                  <div className="text-white font-semibold truncate">admin@kerenga.com</div>
+                  <div className="text-white font-semibold truncate">kirengacargo@gmail.com</div>
                 </div>
               </div>
             </div>
