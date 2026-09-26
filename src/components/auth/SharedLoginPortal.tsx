@@ -94,6 +94,8 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
         onNavigate('driver');
       } else if (role === 'staff' || role === 'worker' || role === 'operations' || role === 'finance' || role === 'support') {
         onNavigate('staff');
+      } else if (role === 'customer') {
+        onNavigate('customer');
       } else {
         onNavigate('home');
       }
