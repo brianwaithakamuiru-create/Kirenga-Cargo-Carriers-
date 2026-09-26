@@ -125,9 +125,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
             </button>
 
             {!currentUser && (
-              <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl border border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/50 text-xs font-semibold flex items-center gap-1.5">
-                <LogIn className="w-3.5 h-3.5" /><span>Sign in</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => onNavigate('login')} className="px-4 py-2 rounded-xl border border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/50 text-xs font-semibold flex items-center gap-1.5">
+                  <LogIn className="w-3.5 h-3.5" /><span>Portal Sign in</span>
+                </button>
+                <button onClick={() => onNavigate('admin')} className="px-4 py-2 rounded-xl border border-amber-400/40 bg-amber-950/20 text-amber-200 hover:bg-amber-950/40 text-xs font-bold flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5" /><span>Administrator Login</span>
+                </button>
+              </div>
             )}
             <button
               onClick={() => onNavigate('book')}
@@ -175,9 +180,14 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
 
           <div className="pt-3 border-t border-slate-800 flex flex-col gap-2">
             {!currentUser && (
-              <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="w-full py-2.5 rounded-xl border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center justify-center gap-2">
-                <LogIn className="w-4 h-4" /><span>Sign in to your portal</span>
-              </button>
+              <>
+                <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} className="w-full py-2.5 rounded-xl border border-cyan-500/40 text-cyan-200 text-xs font-semibold flex items-center justify-center gap-2">
+                  <LogIn className="w-4 h-4" /><span>Sign in to your portal</span>
+                </button>
+                <button onClick={() => { onNavigate('admin'); setMobileMenuOpen(false); }} className="w-full py-2.5 rounded-xl border border-amber-400/40 bg-amber-950/20 text-amber-200 text-xs font-bold flex items-center justify-center gap-2">
+                  <Shield className="w-4 h-4" /><span>Administrator Login</span>
+                </button>
+              </>
             )}
             <button
               onClick={() => {
