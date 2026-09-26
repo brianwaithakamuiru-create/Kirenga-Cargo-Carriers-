@@ -1,5 +1,5 @@
 import React from 'react';
-import { Shipment, ShipmentTimelineEvent } from '../../types';
+import { PublicShipmentTracking } from '../../types';
 import { useAnimations } from '../../context/AnimationContext';
 import { MapPin, CheckCircle2, Clock, Truck, ShieldCheck, ArrowRight } from 'lucide-react';
 
@@ -13,7 +13,7 @@ interface CheckpointItem {
 }
 
 interface CargoTrackingAnimationProps {
-  shipment?: Shipment | null;
+  shipment?: PublicShipmentTracking | null;
   customCheckpoints?: CheckpointItem[];
   className?: string;
   interactive?: boolean;
@@ -36,21 +36,6 @@ export const CargoTrackingAnimation: React.FC<CargoTrackingAnimationProps> = ({
     if (shipment) {
       const origin = `${shipment.originCity || 'Origin'}, ${shipment.originCountry || 'EA'}`;
       const destination = `${shipment.destinationCity || 'Destination'}, ${shipment.destinationCountry || 'EA'}`;
-
-      // If shipment has custom timeline events, map them
-      if (shipment.timeline && shipment.timeline.length > 0) {
-        return shipment.timeline.map((evt, idx) => {
-          const isLastCompleted = evt.completed && (idx === shipment.timeline.length - 1 || !shipment.timeline[idx + 1]?.completed);
-          return {
-            id: `chk_${idx}`,
-            name: evt.stage,
-            location: idx === 0 ? origin : idx === shipment.timeline.length - 1 ? destination : 'Transit Corridor',
-            status: evt.completed ? (isLastCompleted && shipment.status !== 'DELIVERED' ? 'active' : 'completed') : 'pending',
-            timestamp: evt.timestamp,
-            notes: evt.notes,
-          };
-        });
-      }
 
       // Default realistic milestones based on actual shipment status
       const status = (shipment.status || 'BOOKED').toUpperCase();
