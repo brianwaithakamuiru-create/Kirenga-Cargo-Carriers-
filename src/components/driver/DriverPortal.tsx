@@ -288,7 +288,7 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({ onNavigate }) => {
       // 3. Fetch legacy trip notices and account-addressed admin broadcasts.
       const [driverNotifs, accountNotifs] = await Promise.all([
         db.getAll<DriverNotification>(COLLECTIONS.DRIVER_NOTIFICATIONS),
-        db.getAll<any>(COLLECTIONS.NOTIFICATIONS),
+        db.getByField<any>(COLLECTIONS.NOTIFICATIONS, 'userId', currentUser.uid),
       ]);
       const myNotifs: DriverNotification[] = [
         ...driverNotifs.filter((n) => n.driverId === currentUser.uid || n.driverId === '*'),
