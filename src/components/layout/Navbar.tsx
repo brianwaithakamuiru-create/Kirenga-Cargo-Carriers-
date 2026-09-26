@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Shield, Compass, Briefcase, LogOut, Search, PackageCheck, LogIn, UserRound } from 'lucide-react';
+import { Menu, X, Shield, Compass, Briefcase, LogOut, Search, PackageCheck, LogIn } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CompanyLogo } from '../common/CompanyLogo';
 
@@ -26,7 +26,6 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
     if (role === 'admin') onNavigate('admin');
     else if (role === 'driver') onNavigate('driver');
     else if (role === 'worker' || role === 'staff') onNavigate('staff');
-    else if (role === 'customer') onNavigate('customer');
     else onNavigate('home');
   };
 
@@ -56,14 +55,11 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                   {role === 'admin' && <Shield className="w-3.5 h-3.5" />}
                   {role === 'driver' && <Compass className="w-3.5 h-3.5" />}
                   {(role === 'worker' || role === 'staff') && <Briefcase className="w-3.5 h-3.5" />}
-                  {role === 'customer' && <UserRound className="w-3.5 h-3.5" />}
                   <span>
                     {role === 'admin'
                       ? 'Admin Central'
                       : role === 'driver'
                       ? 'Driver Portal'
-                      : role === 'customer'
-                      ? 'Client Portal'
                       : 'Staff Workplace'}
                   </span>
                 </button>
