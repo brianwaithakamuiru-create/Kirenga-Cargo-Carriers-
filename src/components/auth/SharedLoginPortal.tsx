@@ -108,7 +108,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
     setError(null);
 
     const pin = adminPin.replace(/\D/g, '').slice(0, 5);
-    if (!/^\\d{5}$/.test(pin)) {
+    if (!/^\d{5}$/.test(pin)) {
       setError('Enter the five-digit administrator PIN.');
       return;
     }
