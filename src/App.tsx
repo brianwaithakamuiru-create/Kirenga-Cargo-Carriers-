@@ -197,7 +197,7 @@ const AppContent: React.FC = () => {
             {isAdminView && (
               <>
                 {!currentUser || (role === 'admin' && !adminPinVerified) ? (
-                  <SharedLoginPortal onNavigate={navigateTo} />
+                  <SharedLoginPortal onNavigate={navigateTo} initialPortal="admin" />
                 ) : isAccountUnavailable ? (
                   renderUnavailableScreen()
                 ) : role !== 'admin' ? (
