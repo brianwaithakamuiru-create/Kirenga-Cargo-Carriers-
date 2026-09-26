@@ -13,7 +13,7 @@ interface LoadingScreenProps {
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   onComplete,
   message = 'Preparing your logistics experience...',
-  minDurationMs = 1200,
+  minDurationMs = 350,
 }) => {
   const { loadingAnimationEnabled, reducedMotion } = useAnimations();
   const { companyName } = useBranding();
@@ -34,7 +34,7 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
           setFadingOut(true);
           setTimeout(() => {
             if (onComplete) onComplete();
-          }, 400);
+          }, 150);
           return 100;
         }
         return prev + 18;
@@ -48,13 +48,13 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
   return (
     <div
-      className={`fixed inset-0 z-[9999] bg-[#040817] flex flex-col items-center justify-center p-6 transition-opacity duration-500 ${
+      className={`fixed inset-0 z-[9999] bg-[#360810] flex flex-col items-center justify-center p-6 transition-opacity duration-500 ${
         fadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
       {/* Background ambient lighting */}
-      <div className="absolute w-96 h-96 rounded-full bg-cyan-600/10 blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-20 w-80 h-80 rounded-full bg-blue-600/10 blur-[100px] pointer-events-none" />
+      <div className="absolute w-96 h-96 rounded-full bg-[#D4A017]/10 blur-[120px] pointer-events-none" />
+      <div className="absolute -bottom-20 w-80 h-80 rounded-full bg-[#7A5210]/10 blur-[100px] pointer-events-none" />
 
       <div className="relative z-10 max-w-md w-full flex flex-col items-center text-center space-y-6">
         {/* Company Logo Display */}
@@ -69,23 +69,23 @@ export const LoadingScreen: React.FC<LoadingScreenProps> = ({
 
         {/* Dynamic Status Text */}
         <div className="space-y-1.5">
-          <div className="text-xs uppercase tracking-[0.25em] font-mono font-bold text-cyan-400 animate-pulse">
+          <div className="text-xs uppercase tracking-[0.25em] font-mono font-bold text-[#E6C76A] animate-pulse">
             CENTRAL CORRIDOR TELEMETRY
           </div>
-          <p className="text-sm font-medium text-slate-300 font-['Poppins']">
+          <p className="text-sm font-medium text-[#C8B6AE] font-['Poppins']">
             {message}
           </p>
         </div>
 
         {/* High-Tech Glowing Progress Bar */}
         <div className="w-64 max-w-full">
-          <div className="h-1.5 w-full bg-slate-800/80 rounded-full overflow-hidden border border-slate-700/50 p-0.5">
+          <div className="h-1.5 w-full bg-[#2A060C]/80 rounded-full overflow-hidden border border-[#D4A017]/20 p-0.5">
             <div
               style={{ width: `${progress}%` }}
-              className="h-full bg-gradient-to-r from-blue-600 via-cyan-400 to-emerald-400 rounded-full transition-all duration-300 ease-out shadow-sm shadow-cyan-400/50"
+              className="h-full bg-gradient-to-r from-[#B88712] via-[#D4A017] to-[#E6C76A] rounded-full transition-all duration-300 ease-out shadow-sm shadow-[#D4A017]/40"
             />
           </div>
-          <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 mt-2">
+          <div className="flex justify-between items-center text-[10px] font-mono text-[#B89F96] mt-2">
             <span>KIRENGA CARGO CARRIERS</span>
             <span>{Math.min(100, Math.round(progress))}%</span>
           </div>
