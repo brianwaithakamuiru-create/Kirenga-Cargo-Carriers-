@@ -27,7 +27,6 @@ import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Lock, Headphones, Phone
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>('home');
-  const [appLoaded] = useState<boolean>(true);
   const { currentUser, userProfile, role, signOut, isSessionLocked, mustChangePassword } = useAuth();
 
   // Handle URL hash and path routing (e.g. #/login, #/admin, #/driver, #/staff, #/change-password)
