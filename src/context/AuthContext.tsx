@@ -104,43 +104,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           userEmail === 'kirengacarogocariers@gmail.com' ||
           userEmail === 'brianwaithakamuiru@gmail.com';
 
-        // Auto-provision or repair Admin profile if authenticated as Kirenga Administrator
-        if (isAdminEmail) {
-          const now = new Date().toISOString();
-          if (!profile) {
-            profile = {
-              id: user.uid,
-              uid: user.uid,
-              fullName: 'Kirenga Central Administrator',
-              username: user.email?.split('@')[0] || 'admin',
-              email: user.email || 'kirengacargoc@gmail.com',
-              phone: '+256 700 000 000',
-              country: 'Uganda',
-              role: 'ADMIN',
-              status: 'ACTIVE',
-              department: 'Administration',
-              employeeId: 'KCC-ADM-001',
-              mustChangePassword: false,
-              failedLoginAttempts: 0,
-              lastLoginAt: now,
-              workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
-              createdAt: now,
-              updatedAt: now,
-            };
-            try {
-              await db.saveUserProfile(profile);
-              setUserProfile(profile);
-            } catch (err) {
-              console.error('Error auto-saving admin profile in listener:', err);
-            }
-          } else if (profile.role !== 'ADMIN' || profile.status !== 'ACTIVE') {
-            await db.updateUserProfile(user.uid, { role: 'ADMIN', status: 'ACTIVE' });
-            profile.role = 'ADMIN';
-            profile.status = 'ACTIVE';
-            profileCacheRef.current.set(user.uid, profile);
-            setUserProfile(profile);
-          }
-        }
+        // Admin provisioning/repair is handled during the explicit login flow.
+        // Do not perform additional Firestore writes from the auth-state listener.
 
         // Enforce account status check
         if (profile) {
