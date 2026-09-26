@@ -89,6 +89,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         let profile = await loadProfile(user.uid);
         const userEmail = (user.email || '').toLowerCase();
         const isAdminEmail =
+          userEmail === 'kirengacargooc@gmail.com' ||
+          userEmail === 'kirengacargoc@gmail.com' ||
           userEmail === 'kirengacargocariers@gmail.com' ||
           userEmail === 'kirengacarogocariers@gmail.com' ||
           userEmail === 'brianwaithakamuiru@gmail.com';
@@ -189,11 +191,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const lowerInput = input.toLowerCase();
       if (
         lowerInput === 'admin' ||
+        lowerInput === 'kirengacargo' ||
+        lowerInput === 'kirengacargoc' ||
         lowerInput === 'kirengacargocariers' ||
         lowerInput === 'kcc-admin' ||
         lowerInput === 'central-admin'
       ) {
-        emailToUse = 'kirengacargocariers@gmail.com';
+        emailToUse = 'kirengacargoc@gmail.com';
       } else {
         prospectiveUser = await db.getUserByUsername(input);
         if (!prospectiveUser || !prospectiveUser.email) {
