@@ -8,12 +8,10 @@ interface ChangePasswordScreenProps {
 }
 
 export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSuccess, onSignOut }) => {
-  const { userProfile, changeTemporaryPassword, signOut } = useAuth();
+  const { userProfile, setInitialPassword, signOut } = useAuth();
 
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -25,16 +23,8 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
     e.preventDefault();
     setError(null);
 
-    if (!currentPassword) {
-      setError('Please enter your current temporary password.');
-      return;
-    }
     if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters long.');
-      return;
-    }
-    if (newPassword === currentPassword) {
-      setError('New password cannot be the same as your temporary password.');
+      setError('Administrator password must be at least 8 characters long.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -44,14 +34,14 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
 
     setLoading(true);
     try {
-      await changeTemporaryPassword(currentPassword, newPassword);
+      await setInitialPassword(newPassword);
       setSuccess(true);
       setTimeout(() => {
         onSuccess();
       }, 1200);
     } catch (err: any) {
       if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('The current temporary password you entered is incorrect.');
+        setError('The password could not be created. Please sign in again and retry.');
       } else {
         setError(err.message || 'Failed to update password. Please check your credentials.');
       }
@@ -84,10 +74,10 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
               Security Compliance
             </span>
             <h1 className="text-2xl font-bold text-white font-['Poppins'] mt-1">
-              Create New Secure Password
+              Set Your Administrator Password
             </h1>
             <p className="text-slate-300 text-xs mt-3 leading-relaxed bg-cyan-950/40 border border-cyan-500/20 rounded-xl p-3">
-              Your administrator provided temporary access. Create a new secure password before continuing.
+              You are signed in with an authorized administrator identity. Create your personal workplace password once; it will not be required for administrator sign-in.
             </p>
           </div>
 
@@ -102,37 +92,10 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
             <div className="p-5 rounded-2xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-200 text-center space-y-3">
               <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto" />
               <p className="text-sm font-semibold text-white">Password Updated Successfully!</p>
-              <p className="text-xs text-slate-300">Redirecting to your authorized workplace...</p>
+              <p className="text-xs text-slate-300">Your password is saved. Redirecting to the administrator workplace...</p>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Current Temporary Password */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 font-mono">
-                  Current / Temporary Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type={showCurrent ? 'text' : 'password'}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter assigned temporary password"
-                    className="w-full pl-10 pr-11 py-2.5 bg-[#050915] border border-slate-700 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowCurrent(!showCurrent)}
-                    className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-200"
-                  >
-                    {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
               {/* New Password */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 font-mono">
@@ -146,7 +109,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
                     type={showNew ? 'text' : 'password'}
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
+                    placeholder="Minimum 8 characters"
                     className="w-full pl-10 pr-11 py-2.5 bg-[#050915] border border-slate-700 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
                     required
                   />
@@ -201,7 +164,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
                     </>
                   ) : (
                     <>
-                      <span>Save New Password & Continue</span>
+                      <span>Set Password & Continue</span>
                       <ArrowRight className="w-4 h-4" />
                     </>
                   )}
