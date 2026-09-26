@@ -32,6 +32,9 @@ export default {
     } catch {
       return Response.json({ error: 'Enter a valid tracking reference and booking phone number.' }, { status: 400 });
     }
+    if (!payload || typeof payload !== 'object') {
+      return Response.json({ error: 'Enter a valid tracking reference and booking phone number.' }, { status: 400 });
+    }
     const trackingNumber = typeof payload.trackingNumber === 'string' ? payload.trackingNumber.trim().toUpperCase() : '';
     const phoneNumber = normalizePhone(payload.phoneNumber);
     if (!/^KCC-\d{4}-\d{6}$/.test(trackingNumber) || phoneNumber.length < 8 || phoneNumber.length > 15) {
