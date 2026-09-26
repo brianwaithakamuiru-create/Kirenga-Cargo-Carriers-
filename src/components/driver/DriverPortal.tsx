@@ -388,14 +388,14 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({ onNavigate }) => {
   };
 
   const navItems: { key: DriverNavKey; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
-    { key: 'driver-command', label: 'Driver Command', icon: Compass },
+    { key: 'driver-command', label: 'Dashboard', icon: Compass },
     { key: 'my-profile', label: 'My Profile', icon: User },
     { key: 'my-vehicle', label: 'My Vehicle', icon: Truck },
-    { key: 'vehicle-documents', label: 'Vehicle Documents', icon: FileText },
-    { key: 'assigned-trips', label: 'Assigned Trips', icon: RouteIcon, count: assignedTrips.length },
+    { key: 'vehicle-documents', label: 'Documents', icon: FileText },
+    { key: 'assigned-trips', label: 'My Cargo', icon: RouteIcon, count: assignedTrips.length },
     { key: 'routes', label: 'Routes', icon: MapPin },
-    { key: 'cargo', label: 'Cargo', icon: Package },
-    { key: 'delivery-status', label: 'Delivery Status', icon: CheckCircle2 },
+    { key: 'cargo', label: 'Cargo Details', icon: Package },
+    { key: 'delivery-status', label: 'Deliveries', icon: CheckCircle2 },
     { key: 'trip-documents', label: 'Trip Documents', icon: FileCheck, count: documents.length },
     { key: 'notifications', label: 'Notifications', icon: Bell, count: notifications.length },
     { key: 'support', label: 'Support', icon: HelpCircle },
