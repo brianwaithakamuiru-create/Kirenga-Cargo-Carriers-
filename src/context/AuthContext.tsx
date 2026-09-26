@@ -15,6 +15,7 @@ import {
   GoogleAuthProvider,
   OAuthProvider,
   signInWithPopup,
+  signInWithCustomToken,
   linkWithPopup,
   unlink,
 } from 'firebase/auth';
@@ -33,6 +34,7 @@ interface AuthContextType {
   systemSettings: SystemSettings;
   signIn: (emailOrUsername: string, pass: string, remember?: boolean, expectedRole?: 'admin' | 'customer' | 'driver' | 'staff') => Promise<UserProfile>;
   signInWithGoogle: () => Promise<UserProfile>;
+  signInWithAdminPin: (pin: string, confirmation: string) => Promise<UserProfile>;
   signInWithAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<UserProfile>;
   linkGoogleAccount: () => Promise<void>;
   linkAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<void>;
@@ -324,6 +326,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       details: `Successful sign-in with role ${profile.role}`,
     }).catch(() => {});
 
+    return profile;
+  };
+
+  const signInWithAdminPin = async (pin: string, confirmation: string): Promise<UserProfile> => {
+    if (!/^\d{5}$/.test(pin) || pin !== confirmation) {
+      throw new Error('Enter the same five-digit PIN in both fields.');
+    }
+    const response = await fetch('/api/admin-pin', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pin, confirmation }),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.token) {
+      throw new Error(result.error || 'Admin PIN sign-in is currently unavailable.');
+    }
+
+    await setPersistence(auth, browserLocalPersistence);
+    persistenceRef.current = true;
+    const credential = await signInWithCustomToken(auth, result.token);
+    const profile = await db.getUserProfile(credential.user.uid);
+    if (!profile || profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('This PIN is not connected to an active administrator account.');
+    }
+    profileCacheRef.current.set(credential.user.uid, profile);
+    setCurrentUser(credential.user);
+    setUserProfile(profile);
+    setIsSessionLocked(false);
+    void db.logAudit({
+      actorUid: credential.user.uid,
+      actorRole: profile.role,
+      action: 'USER_LOGIN',
+      targetUid: credential.user.uid,
+      details: 'Administrator signed in with PIN.',
+    }).catch(() => {});
     return profile;
   };
 
@@ -692,6 +732,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         systemSettings,
         signIn,
         signInWithGoogle,
+        signInWithAdminPin,
         signInWithAdminProvider,
         linkGoogleAccount,
         linkAdminProvider,
