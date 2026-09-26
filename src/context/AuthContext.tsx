@@ -11,6 +11,10 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
+  linkWithPopup,
+  unlink,
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { db } from '../lib/firestoreService';
@@ -26,6 +30,8 @@ interface AuthContextType {
   mustChangePassword: boolean;
   systemSettings: SystemSettings;
   signIn: (emailOrUsername: string, pass: string, remember?: boolean) => Promise<UserProfile>;
+  signInWithGoogle: () => Promise<UserProfile>;
+  linkGoogleAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   sendPasswordReset: (emailOrUsername: string) => Promise<void>;
   changePassword: (newPass: string, currentPass?: string) => Promise<void>;
@@ -284,6 +290,131 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return profile;
   };
 
+  const signInWithGoogle = async (): Promise<UserProfile> => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      login_hint: 'kirengacargo@gmail.com',
+      prompt: 'select_account',
+    });
+
+    await setPersistence(auth, browserLocalPersistence);
+    persistenceRef.current = true;
+
+    let authUser: User;
+    try {
+      const credential = await signInWithPopup(auth, provider);
+      authUser = credential.user;
+    } catch (err: any) {
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        throw new Error(
+          'This administrator account already uses email and password. Sign in with that method once, then link Google under Admin Security → Password. If needed, use Forgot Password first.'
+        );
+      }
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        throw new Error('Google sign-in was cancelled.');
+      }
+      throw new Error(err.message || 'Google sign-in failed. Please try again.');
+    }
+
+    if (authUser.email?.toLowerCase() !== 'kirengacargo@gmail.com') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('Use the Google account registered for the Kirenga Cargo administrator.');
+    }
+
+    if (!authUser.emailVerified) {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('The administrator Google account must have a verified email address.');
+    }
+
+    let profile = await loadProfile(authUser.uid);
+    if (!profile) {
+      const now = new Date().toISOString();
+      profile = {
+        id: authUser.uid,
+        uid: authUser.uid,
+        fullName: authUser.displayName || 'Kirenga Central Administrator',
+        username: authUser.email.split('@')[0],
+        email: authUser.email,
+        phone: '',
+        country: 'Kenya',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        department: 'Administration',
+        employeeId: 'KCC-ADM-001',
+        mustChangePassword: false,
+        failedLoginAttempts: 0,
+        lastLoginAt: now,
+        workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.saveUserProfile(profile);
+      } catch (err) {
+        await firebaseSignOut(auth);
+        setCurrentUser(null);
+        setUserProfile(null);
+        throw err;
+      }
+    }
+
+    if (profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('This Google account does not have an active Kirenga Cargo administrator profile.');
+    }
+
+    profileCacheRef.current.set(authUser.uid, profile);
+    setCurrentUser(authUser);
+    setUserProfile(profile);
+    setIsSessionLocked(false);
+    void db.logAudit({
+      actorUid: authUser.uid,
+      actorRole: profile.role || 'ADMIN',
+      action: 'USER_LOGIN',
+      targetUid: authUser.uid,
+      details: 'Administrator signed in with Google.',
+    }).catch(() => {});
+    return profile;
+  };
+
+  const linkGoogleAccount = async (): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user || user.email?.toLowerCase() !== 'kirengacargo@gmail.com'
+        || userProfile?.role?.toLowerCase() !== 'admin'
+        || userProfile.status?.toLowerCase() !== 'active') {
+      throw new Error('Sign in as the active Kirenga Cargo administrator before linking Google.');
+    }
+    if (user.providerData.some((item) => item.providerId === 'google.com')) {
+      return;
+    }
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      login_hint: user.email,
+      prompt: 'select_account',
+    });
+    const result = await linkWithPopup(user, provider);
+    const googleEmail = result.user.providerData.find((item) => item.providerId === 'google.com')?.email?.toLowerCase();
+    if (googleEmail !== user.email.toLowerCase()) {
+      await unlink(result.user, 'google.com');
+      throw new Error('Choose the same administrator email address when linking Google.');
+    }
+
+    await db.logAudit({
+      actorUid: user.uid,
+      actorRole: userProfile.role,
+      action: 'GOOGLE_PROVIDER_LINKED',
+      targetUid: user.uid,
+      details: 'Administrator linked Google sign-in to the existing account.',
+    }).catch(() => {});
+  };
+
   // Sign Out
   const signOut = async () => {
     // Sign out immediately; audit logging must never block the logout button.
@@ -442,6 +573,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         mustChangePassword,
         systemSettings,
         signIn,
+        signInWithGoogle,
+        linkGoogleAccount,
         signOut,
         sendPasswordReset,
         changePassword,
