@@ -289,49 +289,7 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
             </div>
           )}
 
-          {/* Chronological Milestone Timeline */}
-          {shipment.timeline && shipment.timeline.length > 0 && (
-            <div className="p-6 rounded-3xl bg-[#0A1024] border border-slate-800 shadow-2xl">
-              <h4 className="text-sm font-bold text-white mb-4 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-cyan-400" />
-                <span>Verified Transit Milestones</span>
-              </h4>
 
-              <div className="space-y-4">
-                {shipment.timeline.map((event, idx) => (
-                  <div key={idx} className="flex gap-4">
-                    <div className="flex flex-col items-center">
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          event.completed
-                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
-                            : 'bg-slate-800 text-slate-500'
-                        }`}
-                      >
-                        {event.completed ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3 h-3" />}
-                      </div>
-                      {idx < shipment.timeline.length - 1 && (
-                        <div className="w-0.5 h-full bg-slate-800 my-1" />
-                      )}
-                    </div>
-                    <div className="pb-4">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-xs font-['Poppins']">{event.stage}</span>
-                        {event.timestamp && (
-                          <span className="text-[10px] font-mono text-slate-500">
-                            {new Date(event.timestamp).toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                      {event.notes && (
-                        <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">{event.notes}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
