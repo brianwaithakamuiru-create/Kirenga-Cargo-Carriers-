@@ -30,6 +30,7 @@ service cloud.firestore {
 
     function isAdminBootstrapEmail() {
       return isSignedIn() && (
+        request.auth.token.email == 'kirengacargoc@gmail.com' ||
         request.auth.token.email == 'kirengacargocariers@gmail.com' ||
         request.auth.token.email == 'kirengacarogocariers@gmail.com' ||
         request.auth.token.email == 'brianwaithakamuiru@gmail.com'
@@ -91,7 +92,8 @@ service cloud.firestore {
             && request.auth.uid == userId
             && isAdminBootstrapEmail()
             && !userDocExists()
-            && (request.resource.data.email == 'kirengacargocariers@gmail.com' || request.resource.data.email == 'kirengacarogocariers@gmail.com' || request.resource.data.email == 'brianwaithakamuiru@gmail.com')
+            && (request.resource.data.email == 'kirengacargoc@gmail.com' ||
+            request.resource.data.email == 'kirengacargocariers@gmail.com' || request.resource.data.email == 'kirengacarogocariers@gmail.com' || request.resource.data.email == 'brianwaithakamuiru@gmail.com')
             && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN')
             && (request.resource.data.status == 'active' || request.resource.data.status == 'ACTIVE')
             && hasValidTimestamps());
