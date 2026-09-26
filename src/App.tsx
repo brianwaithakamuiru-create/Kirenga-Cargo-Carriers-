@@ -204,6 +204,7 @@ const AppContent: React.FC = () => {
                   const r = (userProfile?.role || '').toLowerCase();
                   if (r === 'admin') navigateTo('admin');
                   else if (r === 'driver') navigateTo('driver');
+                  else if (r === 'customer') navigateTo('customer');
                   else navigateTo('staff');
                 }}
                 onSignOut={() => navigateTo('login')}
