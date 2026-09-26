@@ -31,7 +31,7 @@ interface AdminSecurityProps {
 }
 
 export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'users' }) => {
-  const { currentUser, userProfile, changePassword, systemSettings } = useAuth();
+  const { currentUser, userProfile, changePassword, linkGoogleAccount, systemSettings } = useAuth();
 
   const [activeTab, setActiveTab] = useState<'users' | 'activity' | 'audit' | 'autolock' | 'password'>(initialSubTab);
 
@@ -48,6 +48,9 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
   const [passSubmitting, setPassSubmitting] = useState(false);
   const [passSuccess, setPassSuccess] = useState<string | null>(null);
   const [passError, setPassError] = useState<string | null>(null);
+  const [googleLinking, setGoogleLinking] = useState(false);
+  const [googleLinkMessage, setGoogleLinkMessage] = useState<string | null>(null);
+  const [googleLinkError, setGoogleLinkError] = useState<string | null>(null);
 
   // Audit Logs state
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -100,6 +103,20 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
       setTimeoutSeconds(systemSettings.sessionTimeoutSeconds);
     }
   }, [systemSettings.sessionTimeoutSeconds]);
+
+  const handleLinkGoogleAccount = async () => {
+    setGoogleLinking(true);
+    setGoogleLinkMessage(null);
+    setGoogleLinkError(null);
+    try {
+      await linkGoogleAccount();
+      setGoogleLinkMessage('Google sign-in is linked to this administrator account.');
+    } catch (err: any) {
+      setGoogleLinkError(err.message || 'Could not link this Google account.');
+    } finally {
+      setGoogleLinking(false);
+    }
+  };
 
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -366,6 +383,29 @@ export const AdminSecurity: React.FC<AdminSecurityProps> = ({ initialSubTab = 'u
               <h3 className="text-base font-bold text-white font-['Poppins']">Administrator Password</h3>
               <p className="text-xs text-slate-400">Update root administrator authentication credentials</p>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+            <div>
+              <p className="text-sm font-semibold text-white">Google sign-in</p>
+              <p className="mt-1 text-xs text-slate-400">
+                Link Google to this existing admin account so future Google sign-ins keep the same administrator profile.
+              </p>
+            </div>
+            {currentUser?.providerData.some((provider) => provider.providerId === 'google.com') ? (
+              <p className="text-xs text-emerald-300">Google is linked to this account.</p>
+            ) : (
+              <button
+                type="button"
+                onClick={handleLinkGoogleAccount}
+                disabled={googleLinking}
+                className="rounded-lg bg-white px-4 py-2 text-xs font-semibold text-slate-900 disabled:opacity-60"
+              >
+                {googleLinking ? 'Linking Google…' : 'Link Google account'}
+              </button>
+            )}
+            {googleLinkMessage && <p className="text-xs text-emerald-300">{googleLinkMessage}</p>}
+            {googleLinkError && <p className="text-xs text-red-300">{googleLinkError}</p>}
           </div>
 
           {passSuccess && (
