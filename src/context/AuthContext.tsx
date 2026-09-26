@@ -496,6 +496,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       prompt: 'select_account',
     });
     const result = await linkWithPopup(user, provider);
+    setCurrentUser(result.user);
     const googleEmail = result.user.providerData.find((item) => item.providerId === 'google.com')?.email?.toLowerCase();
     if (googleEmail !== user.email.toLowerCase()) {
       await unlink(result.user, 'google.com');
@@ -520,7 +521,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const provider = new OAuthProvider(providerId);
     provider.setCustomParameters({ prompt: 'select_account' });
     if (providerId === 'apple.com') provider.addScope('email');
-    await linkWithPopup(user, provider);
+    const linkedCredential = await linkWithPopup(user, provider);
+    setCurrentUser(linkedCredential.user);
     await db.logAudit({
       actorUid: user.uid,
       actorRole: userProfile.role,
