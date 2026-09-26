@@ -272,7 +272,6 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                 type="button"
                 onClick={() => {
                   setSelectedPortal(item.id as typeof selectedPortal);
-                  if (item.id === 'admin') setEmailOrUsername('kirengacargo@gmail.com');
                   setError(null);
                 }}
                 aria-pressed={selectedPortal === item.id}
@@ -286,7 +285,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
           {selectedPortal === 'admin' && (
             <p className="mb-4 -mt-3 text-center text-xs text-cyan-200">
-              Admin account: <strong>kirengacargo@gmail.com</strong>
+              Use either authorized Google account: <strong>kirengacargo@gmail.com</strong> or <strong>brianwaithakamuiru@gmail.com</strong>
             </p>
           )}
 
