@@ -24,7 +24,7 @@ import {
   MapPin,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { db } from '../../lib/firestoreService';
+import { db, COLLECTIONS } from '../../lib/firestoreService';
 import { EmptyState } from '../common/EmptyState';
 import { CompanyLogo } from '../common/CompanyLogo';
 
@@ -75,14 +75,12 @@ export const WorkerPortal: React.FC<WorkerPortalProps> = ({ onNavigate }) => {
       // In a real system with empty database, starts with real Firestore state
       const [allDocs, allNotifs] = await Promise.all([
         db.getAll<any>('documents'),
-        db.getAll<any>('notifications'),
+        db.getByField<any>(COLLECTIONS.NOTIFICATIONS, 'userId', currentUser.uid),
       ]);
       const myDocs = allDocs.filter(
         (d) => d.uploadedBy === currentUser.uid || d.department === userProfile?.department
       );
-      const myNotifs = allNotifs.filter(
-        (n) => n.userId === currentUser.uid || n.department === userProfile?.department
-      );
+      const myNotifs = allNotifs;
       setDepartmentDocs(myDocs);
       setNotifications(myNotifs);
     } catch (err) {

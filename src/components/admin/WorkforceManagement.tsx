@@ -65,8 +65,8 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
   const [staffEmail, setStaffEmail] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
   const [staffUsername, setStaffUsername] = useState('');
-  const [staffDepartment, setStaffDepartment] = useState('Operations');
-  const [staffPosition, setStaffPosition] = useState('Logistics Coordinator');
+  const [staffDepartment, setStaffDepartment] = useState('');
+  const [staffPosition, setStaffPosition] = useState('');
   const [staffTempPassword, setStaffTempPassword] = useState('');
   const [staffStatus, setStaffStatus] = useState<'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'LOCKED'>('ACTIVE');
   const [showStaffPassword, setShowStaffPassword] = useState(false);
@@ -78,12 +78,13 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
   const [driverFullName, setDriverFullName] = useState('');
   const [driverEmail, setDriverEmail] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
+  const [driverCountry, setDriverCountry] = useState('');
   const [driverUsername, setDriverUsername] = useState('');
   const [driverRefNumber, setDriverRefNumber] = useState('');
-  const [driverLicenseInfo, setDriverLicenseInfo] = useState('Class CE (Heavy Articulated & Trailer)');
+  const [driverLicenseInfo, setDriverLicenseInfo] = useState('');
   const [driverLicenseExpiry, setDriverLicenseExpiry] = useState('');
   const [driverAssignedVehicle, setDriverAssignedVehicle] = useState('');
-  const [driverAssignedRoute, setDriverAssignedRoute] = useState('Northern Corridor (Mombasa - Kampala - Kigali)');
+  const [driverAssignedRoute, setDriverAssignedRoute] = useState('');
   const [driverEmergencyContact, setDriverEmergencyContact] = useState('');
   const [driverEmploymentStatus, setDriverEmploymentStatus] = useState('FULL_TIME');
   const [driverTempPassword, setDriverTempPassword] = useState('');
@@ -317,6 +318,7 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
         username: cleanUsername,
         email: cleanEmail,
         phone: cleanPhone,
+        country: driverCountry.trim(),
         role: 'DRIVER',
         department: 'Transport',
         position: 'Commercial Heavy Haulage Driver',
@@ -354,7 +356,7 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
         assignedVehicleReg: selectedVehicleDoc?.registrationNumber || '',
         status: driverStatus === 'ACTIVE' ? 'AVAILABLE' : 'INACTIVE',
         employmentType: driverEmploymentStatus,
-        country: 'Uganda',
+        country: driverCountry.trim(),
         joinedDate: now.split('T')[0],
         createdAt: now,
         updatedAt: now,
@@ -1067,6 +1069,7 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs focus:outline-none focus:border-cyan-400"
                   required
                 >
+                  <option value="" disabled>Select a department</option>
                   {departments.length > 0 ? (
                     departments.map((d) => (
                       <option key={d.id} value={d.name}>
@@ -1257,6 +1260,22 @@ export const WorkforceManagement: React.FC<WorkforceManagementProps> = ({
                   placeholder="+254 711 000 111"
                   className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:border-teal-400"
                   required
+                />
+              </div>
+
+              {/* Country */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5 font-mono">
+                  Country *
+                </label>
+                <input
+                  type="text"
+                  required
+                  maxLength={80}
+                  value={driverCountry}
+                  onChange={(e) => setDriverCountry(e.target.value)}
+                  placeholder="Enter driver's country"
+                  className="w-full px-3.5 py-2.5 bg-slate-950 border border-slate-700/80 rounded-xl text-white text-xs placeholder-slate-500 focus:outline-none focus:border-teal-400"
                 />
               </div>
 

@@ -285,11 +285,25 @@ export const DriverPortal: React.FC<DriverPortalProps> = ({ onNavigate }) => {
       );
       setVehicle(driverVehicle || null);
 
-      // 3. Fetch notifications
-      const allNotifs = await db.getAll<DriverNotification>(COLLECTIONS.DRIVER_NOTIFICATIONS);
-      const myNotifs = allNotifs.filter(
-        (n) => n.driverId === currentUser.uid || n.driverId === '*'
-      );
+      // 3. Fetch legacy trip notices and account-addressed admin broadcasts.
+      const [driverNotifs, accountNotifs] = await Promise.all([
+        db.getAll<DriverNotification>(COLLECTIONS.DRIVER_NOTIFICATIONS),
+        db.getByField<any>(COLLECTIONS.NOTIFICATIONS, 'userId', currentUser.uid),
+      ]);
+      const myNotifs: DriverNotification[] = [
+        ...driverNotifs.filter((n) => n.driverId === currentUser.uid || n.driverId === '*'),
+        ...accountNotifs
+          .filter((n) => n.userId === currentUser.uid)
+          .map((n) => ({
+            id: n.id,
+            driverId: currentUser.uid,
+            title: n.title,
+            message: n.message,
+            type: 'SYSTEM' as const,
+            read: Boolean(n.read),
+            createdAt: n.createdAt,
+          })),
+      ];
       setNotifications(myNotifs);
 
       // 4. Fetch trip/vehicle documents

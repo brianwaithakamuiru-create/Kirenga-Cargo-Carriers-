@@ -4,6 +4,7 @@ import {
   Users,
   Compass,
   Briefcase,
+  Building2,
   Truck,
   Package,
   Route as RouteIcon,
@@ -57,6 +58,7 @@ import {
 } from '../../types';
 import { EmptyState } from '../common/EmptyState';
 import { WorkforceManagement } from './WorkforceManagement';
+import { BranchManagement } from './BranchManagement';
 import { AdminSettings } from './AdminSettings';
 import { AdminSecurity } from './AdminSecurity';
 import { WebsiteManagement } from './WebsiteManagement';
@@ -86,6 +88,7 @@ export type AdminNavKey =
   | 'finance'
   | 'documents'
   | 'routes'
+  | 'branches'
   | 'reports'
   | 'notifications'
   | 'website'
@@ -115,6 +118,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     if (clean === 'finance') return 'finance';
     if (clean === 'documents') return 'documents';
     if (clean === 'routes') return 'routes';
+    if (clean === 'branches') return 'branches';
     if (clean === 'reports') return 'reports';
     if (clean === 'notifications') return 'notifications';
     if (clean === 'website') return 'website';
@@ -150,6 +154,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [documents, setDocuments] = useState<LogisticsDocument[]>([]);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Dispatch Trip Modal State
   const [showDispatchModal, setShowDispatchModal] = useState(false);
@@ -162,10 +167,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   // Add Vehicle Modal State
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
   const [newReg, setNewReg] = useState('');
-  const [newType, setNewType] = useState('Heavy Prime Mover (6x4)');
-  const [newMake, setNewMake] = useState('Scania');
-  const [newModel, setNewModel] = useState('R500');
-  const [newCapacity, setNewCapacity] = useState('38000');
+  const [newType, setNewType] = useState('');
+  const [newMake, setNewMake] = useState('');
+  const [newModel, setNewModel] = useState('');
+  const [newCapacity, setNewCapacity] = useState('');
 
   // Notification Composer Modal/Form State
   const [composeTitle, setComposeTitle] = useState('');
@@ -224,69 +229,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   };
 
   useEffect(() => {
-    void loadAllData();
-    // A wildcard Firestore subscription caused unnecessary full refreshes and
-    // attempted to subscribe to a non-existent "*" collection. Use the manual
-    // refresh action instead of repeatedly downloading every collection.
-    return undefined;
+    const sources: { collection: string; apply: (items: any[]) => void }[] = [
+      { collection: COLLECTIONS.BOOKINGS, apply: (items) => setBookings(items as Booking[]) },
+      { collection: COLLECTIONS.SHIPMENTS, apply: (items) => setShipments(items as Shipment[]) },
+      { collection: COLLECTIONS.TRIPS, apply: (items) => setTrips(items as Trip[]) },
+      { collection: COLLECTIONS.DRIVERS, apply: (items) => setDrivers(items as Driver[]) },
+      { collection: COLLECTIONS.VEHICLES, apply: (items) => setVehicles(items as Vehicle[]) },
+      { collection: COLLECTIONS.QUOTES, apply: (items) => setQuotes(items as Quote[]) },
+      { collection: COLLECTIONS.INVOICES, apply: (items) => setInvoices(items as Invoice[]) },
+      { collection: COLLECTIONS.DRIVER_EXPENSES, apply: (items) => setExpenses(items as DriverExpense[]) },
+      { collection: COLLECTIONS.VEHICLE_ISSUES, apply: (items) => setVehicleIssues(items as VehicleIssue[]) },
+      { collection: COLLECTIONS.SUPPORT_TICKETS, apply: (items) => setTickets(items as SupportTicket[]) },
+      { collection: COLLECTIONS.CONTACT_MESSAGES, apply: (items) => setContactMessages(items as ContactMessage[]) },
+      { collection: COLLECTIONS.ACTIVITY_LOGS, apply: (items) => setActivityLogs(items as ActivityLog[]) },
+      { collection: COLLECTIONS.CLIENTS, apply: (items) => setClients(items as Client[]) },
+      { collection: COLLECTIONS.DOCUMENTS, apply: (items) => setDocuments(items as LogisticsDocument[]) },
+    ];
+    const initialized = new Set<string>();
+    const markInitialized = (name: string) => {
+      initialized.add(name);
+      if (initialized.size === sources.length) setLoading(false);
+    };
+    const unsubscribers = sources.map((source) =>
+      db.subscribe(
+        source.collection,
+        (items) => {
+          if (items) source.apply(items);
+          markInitialized(source.collection);
+        },
+        () => {
+          setDataError('Some live records could not be loaded. Check your connection and account permissions.');
+          markInitialized(source.collection);
+        }
+      )
+    );
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
 
   // Convert Customer Booking to Official Shipment
-  const handleConvertBooking = async (booking: Booking) => {
+  const handleConvertBooking = async (booking: Booking, assignImmediately = false) => {
     try {
-      const year = new Date().getFullYear();
-      const count = shipments.length + 1;
-      const shipmentNumber = `KCC-${year}-${String(count).padStart(6, '0')}`;
+      const newShipment = await db.confirmBookingToShipment(
+        booking.id,
+        userProfile?.fullName || 'Administrator'
+      );
+      setShipments((current) =>
+        current.some((shipment) => shipment.id === newShipment.id) ? current : [...current, newShipment]
+      );
+      if (assignImmediately) {
+        setSelectedShipmentId(newShipment.id);
+        setShowDispatchModal(true);
+      }
 
-      const newShipment: Shipment = {
-        id: `sh_${Date.now()}`,
-        shipmentNumber,
-        bookingId: booking.id,
-        bookingReference: booking.bookingReference,
-        customerName: booking.fullName,
-        customerPhone: booking.phone,
-        customerEmail: booking.email,
-        originCountry: booking.pickupCountry,
-        originCity: booking.pickupLocation,
-        destinationCountry: booking.deliveryCountry,
-        destinationCity: booking.deliveryLocation,
-        cargoType: booking.cargoType,
-        cargoDescription: booking.cargoDescription,
-        weightKg: booking.weightKg,
-        quantity: booking.quantity,
-        status: 'BOOKED',
-        pickupDate: booking.pickupDate,
-        timeline: [
-          {
-            stage: 'Booking Approved',
-            timestamp: new Date().toISOString(),
-            completed: true,
-            notes: `Converted from Booking Ref ${booking.bookingReference}`,
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await db.add(COLLECTIONS.SHIPMENTS, newShipment);
-      await db.update<Booking>(COLLECTIONS.BOOKINGS, booking.id, {
-        status: 'CONFIRMED',
-        shipmentNumber,
-      });
-
-      await db.logActivity({
-        action: 'Booking Converted to Shipment',
-        actor: userProfile?.fullName || 'Admin',
-        role: 'ADMIN',
-        relatedRecordType: 'SHIPMENT',
-        relatedRecordId: newShipment.id,
-        details: `Booking ${booking.bookingReference} converted to Shipment ${shipmentNumber}`,
-      });
-
-      triggerToast(`Booking converted into Shipment ${shipmentNumber}`);
+      triggerToast(assignImmediately
+        ? 'Booking confirmed. Select an available driver and vehicle to dispatch it.'
+        : 'Booking confirmed and converted into Shipment ' + newShipment.shipmentNumber);
       loadAllData();
     } catch (err: any) {
-      triggerToast(`Error: ${err.message}`);
+      triggerToast(`Could not confirm booking: ${err.message || 'Please try again.'}`);
     }
   };
 
@@ -321,6 +321,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     e.preventDefault();
     try {
       const now = new Date().toISOString();
+      if (!newReg.trim() || !newType.trim() || !newMake.trim() || !newModel.trim() || Number(newCapacity) <= 0) {
+        triggerToast('Enter the registration, vehicle type, make, model, and a valid payload capacity.');
+        return;
+      }
       await db.add<Vehicle>(COLLECTIONS.VEHICLES, {
         id: `veh_${Date.now()}`,
         registrationNumber: newReg.trim().toUpperCase(),
@@ -329,13 +333,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         model: newModel,
         capacityKg: Number(newCapacity),
         status: 'AVAILABLE',
-        currentLocation: 'Kampala Yard',
-        operatingCountries: ['Uganda', 'Tanzania', 'Kenya', 'Rwanda', 'Congo'],
-        lastServiceDate: now.split('T')[0],
         createdAt: now,
       });
       setShowAddVehicleModal(false);
       setNewReg('');
+      setNewType('');
+      setNewMake('');
+      setNewModel('');
+      setNewCapacity('');
       triggerToast('Vehicle registered in Fleet Management');
       loadAllData();
     } catch (err: any) {
@@ -343,7 +348,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     }
   };
 
-  // Send Authorized Broadcast / Notification
+  // Deliver a Firestore notification to each active account in the selected audience.
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTitle.trim() || !composeMessage.trim()) {
@@ -352,21 +357,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     }
     setSendingNotification(true);
     try {
-      const now = new Date().toISOString();
-      await db.logActivity({
-        action: `Notification: ${composeTitle.trim()}`,
-        actor: userProfile?.fullName || 'Administrator',
-        role: 'ADMIN',
-        relatedRecordType: 'OPERATION',
-        details: `[Target: ${composeTarget} | Priority: ${composePriority}] ${composeMessage.trim()}`,
+      const users = await db.getAllUsers();
+      const activeUsers = users.filter((user) => {
+        const status = (user.status || '').toLowerCase();
+        const role = (user.role || '').toLowerCase();
+        if (!user.uid || !['active'].includes(status)) return false;
+        if (composeTarget === 'DRIVERS') return role === 'driver';
+        if (composeTarget === 'STAFF') return ['staff', 'worker', 'operations', 'finance', 'support'].includes(role);
+        if (composeTarget === 'CUSTOMERS') return role === 'customer';
+        return true;
       });
 
-      triggerToast(`Broadcast notification dispatched to ${composeTarget}.`);
-      setComposeTitle('');
-      setComposeMessage('');
-      loadAllData();
+      if (activeUsers.length === 0) {
+        triggerToast(`No active accounts are available for the ${composeTarget.toLowerCase()} audience.`);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const results = await Promise.allSettled(activeUsers.map((user) =>
+        db.add(COLLECTIONS.NOTIFICATIONS, {
+          id: `notification_${user.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          userId: user.uid,
+          title: composeTitle.trim(),
+          message: composeMessage.trim(),
+          type: 'SYSTEM',
+          priority: composePriority,
+          audience: composeTarget,
+          read: false,
+          createdBy: currentUser?.uid || '',
+          createdAt: now,
+          updatedAt: now,
+        })
+      ));
+      const sent = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - sent;
+
+      if (sent > 0) {
+        try {
+          await db.logActivity({
+            action: `Notification: ${composeTitle.trim()}`,
+            actor: userProfile?.fullName || 'Administrator',
+            role: 'ADMIN',
+            relatedRecordType: 'OPERATION',
+            details: `[Target: ${composeTarget} | Priority: ${composePriority}] Delivered to ${sent} active account(s).`,
+          });
+        } catch (auditError) {
+          console.error('Notification was sent, but its activity record could not be saved:', auditError);
+        }
+        setComposeTitle('');
+        setComposeMessage('');
+        triggerToast(failed
+          ? `Sent to ${sent} account(s); ${failed} could not be reached.`
+          : `Notification sent to ${sent} active account(s).`);
+        loadAllData();
+      } else {
+        throw new Error('Firestore rejected the notification records. Check the active security rules and try again.');
+      }
     } catch (err: any) {
-      triggerToast(`Failed to send notification: ${err.message}`);
+      triggerToast(`Failed to send notification: ${err.message || 'Please try again.'}`);
     } finally {
       setSendingNotification(false);
     }
@@ -493,6 +541,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     { key: 'finance', label: 'Finance', icon: DollarSign, badge: unpaidInvoices.length },
     { key: 'documents', label: 'Documents', icon: FileText, badge: expiringDocs.length },
     { key: 'routes', label: 'Routes', icon: RouteIcon },
+    { key: 'branches', label: 'Branches & Offices', icon: Building2 },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
     { key: 'notifications', label: 'Notifications', icon: Bell, badge: pendingBookings.length },
     { key: 'website', label: 'Website Control', icon: Globe },
@@ -622,6 +671,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
           MAIN WORKPLACE VIEW AREA
           ============================================================ */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        {dataError && (
+          <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {dataError}
+            <button onClick={() => { setDataError(null); window.location.reload(); }} className="ml-3 underline underline-offset-2">Retry</button>
+          </div>
+        )}
         {/* GLOBAL COMMAND SEARCH STRIP */}
         <div className="mb-6 relative">
           <div className="flex items-center gap-3 bg-[#0A1024]/90 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl backdrop-blur-md">
@@ -1094,13 +1149,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleConvertBooking(b)}
-                          className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/30 flex items-center gap-1.5 self-start sm:self-auto shrink-0"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve & Create</span>
-                        </button>
+                        <div className="flex flex-wrap gap-2 self-start sm:self-auto shrink-0">
+                          <button
+                            onClick={() => handleConvertBooking(b)}
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700"
+                          >
+                            <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
+                            Create shipment
+                          </button>
+                          <button
+                            onClick={() => handleConvertBooking(b, true)}
+                            className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/30"
+                          >
+                            <Truck className="mr-1 inline h-3.5 w-3.5" />
+                            Create & assign
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1290,6 +1354,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         {activeNav === 'routes' && (
           <OperationsRoutes initialSubTab="routes" onRefreshStats={loadAllData} />
         )}
+
+        {/* ============================================================
+            SECTION: COMPANY BRANCHES
+            ============================================================ */}
+        {activeNav === 'branches' && <BranchManagement />}
 
         {/* ============================================================
             SECTION: REPORTS
@@ -1526,11 +1595,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Shipment --</option>
-                  {shipments.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.shipmentNumber} ({s.customerName} - {s.cargoType})
-                    </option>
-                  ))}
+                  {shipments
+                    .filter((shipment) =>
+                      !shipment.assignedDriverId &&
+                      shipment.status !== 'DELIVERED' &&
+                      shipment.status !== 'CANCELLED'
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.shipmentNumber} ({s.customerName} - {s.cargoType})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -1543,9 +1618,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Driver --</option>
-                  {drivers.map((d) => (
+                  {drivers.filter((driver) => driver.status === 'AVAILABLE').map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.fullName} ({d.phone}) - {d.status}
+                      {d.fullName} ({d.phone})
                     </option>
                   ))}
                 </select>
@@ -1560,9 +1635,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Fleet Vehicle --</option>
-                  {vehicles.map((v) => (
+                  {vehicles.filter((vehicle) => vehicle.status === 'AVAILABLE').map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.registrationNumber} ({v.make} {v.model}) - {v.status}
+                      {v.registrationNumber} ({v.make} {v.model})
                     </option>
                   ))}
                 </select>
@@ -1599,7 +1674,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl"
+                  disabled={!drivers.some((driver) => driver.status === 'AVAILABLE') ||
+                    !vehicles.some((vehicle) => vehicle.status === 'AVAILABLE')}
+                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Confirm Dispatch
                 </button>
@@ -1627,9 +1704,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 />
               </div>
               <div>
-                <label className="block text-slate-300 mb-1">Vehicle Type</label>
+                <label className="block text-slate-300 mb-1">Vehicle Type *</label>
                 <input
                   type="text"
+                  required
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1640,6 +1718,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   <label className="block text-slate-300 mb-1">Make</label>
                   <input
                     type="text"
+                    required
                     value={newMake}
                     onChange={(e) => setNewMake(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1649,6 +1728,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   <label className="block text-slate-300 mb-1">Model</label>
                   <input
                     type="text"
+                    required
                     value={newModel}
                     onChange={(e) => setNewModel(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1659,6 +1739,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 <label className="block text-slate-300 mb-1">Payload Capacity (KG)</label>
                 <input
                   type="number"
+                  min="1"
+                  required
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"

@@ -86,6 +86,7 @@ export const COLLECTIONS = {
   SERVICES: 'services',
   COUNTRIES: 'countries',
   ROUTES: 'routes',
+  BRANCHES: 'branches',
   BRANDING: 'branding',
   COMPANY_SETTINGS: 'companySettings',
   ANIMATION_SETTINGS: 'websiteSettings',
@@ -138,19 +139,23 @@ class FirestoreService {
   }
 
   // Subscribe to real-time changes
-  public subscribe(col: string, callback: () => void): () => void {
+  public subscribe(
+    col: string,
+    callback: (items?: any[]) => void,
+    onError?: (error: Error) => void
+  ): () => void {
     let firestoreUnsub: (() => void) | null = null;
     try {
       firestoreUnsub = onSnapshot(collection(firestore, col), (snap) => {
         const items: any[] = [];
         snap.forEach((d) => items.push({ ...d.data(), id: d.id }));
         this.writeCollection(col, items);
-        callback();
+        callback(items);
       }, (err) => {
-        // Fallback silently if offline or rules restricted
+        onError?.(err);
       });
     } catch (e) {
-      // ignore
+      onError?.(e instanceof Error ? e : new Error('Unable to subscribe to Firestore updates.'));
     }
 
     const handler = (event: Event) => {
@@ -184,6 +189,20 @@ class FirestoreService {
       console.warn(`Firestore read failed for ${col}:`, err);
       return [];
     }
+  }
+
+  public async getAllStrict<T extends { id: string }>(col: string): Promise<T[]> {
+    const snap = await getDocs(collection(firestore, col));
+    const items = snap.docs.map((record) => ({ ...record.data(), id: record.id } as T));
+    this.writeCollection(col, items);
+    return items;
+  }
+
+  public async getByField<T extends { id: string }>(col: string, field: string, value: unknown): Promise<T[]> {
+    const snap = await getDocs(query(collection(firestore, col), where(field, '==', value)));
+    const items = snap.docs.map((d) => ({ ...d.data(), id: d.id } as T));
+    this.writeCollection(col, items);
+    return items;
   }
 
   public async getById<T extends { id: string }>(col: string, id: string): Promise<T | null> {
