@@ -191,6 +191,13 @@ class FirestoreService {
     }
   }
 
+  public async getAllStrict<T extends { id: string }>(col: string): Promise<T[]> {
+    const snap = await getDocs(collection(firestore, col));
+    const items = snap.docs.map((record) => ({ ...record.data(), id: record.id } as T));
+    this.writeCollection(col, items);
+    return items;
+  }
+
   public async getByField<T extends { id: string }>(col: string, field: string, value: unknown): Promise<T[]> {
     const snap = await getDocs(query(collection(firestore, col), where(field, '==', value)));
     const items = snap.docs.map((d) => ({ ...d.data(), id: d.id } as T));
