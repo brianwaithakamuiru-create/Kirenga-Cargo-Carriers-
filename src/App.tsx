@@ -1,67 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { AnimationProvider } from './context/AnimationContext';
-import { SessionLockScreen } from './components/auth/SessionLockScreen';
 import { SharedLoginPortal } from './components/auth/SharedLoginPortal';
-import { ChangePasswordScreen } from './components/auth/ChangePasswordScreen';
-import { Navbar } from './components/layout/Navbar';
-import { Footer } from './components/layout/Footer';
-import { Hero } from './components/public/Hero';
-import { TrackingBox } from './components/public/TrackingBox';
-import { BookingForm } from './components/public/BookingForm';
-import { QuoteForm } from './components/public/QuoteForm';
-import { ServicesSection } from './components/public/ServicesSection';
-import { DestinationsSection } from './components/public/DestinationsSection';
-import { FleetSection } from './components/public/FleetSection';
-import { AboutSection } from './components/public/AboutSection';
-import { ContactSection } from './components/public/ContactSection';
-import { WhyChooseSection } from './components/public/WhyChooseSection';
-import { HowItWorksSection } from './components/public/HowItWorksSection';
-import { TestimonialsSection } from './components/public/TestimonialsSection';
-import { DriverPortal } from './components/driver/DriverPortal';
-import { WorkerPortal } from './components/worker/WorkerPortal';
-import { AdminDashboard } from './components/admin/AdminDashboard';
 import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Headphones, Phone, Mail } from 'lucide-react';
 
+const SessionLockScreen = lazy(() => import('./components/auth/SessionLockScreen').then((m) => ({ default: m.SessionLockScreen })));
+const ChangePasswordScreen = lazy(() => import('./components/auth/ChangePasswordScreen').then((m) => ({ default: m.ChangePasswordScreen })));
+const Navbar = lazy(() => import('./components/layout/Navbar').then((m) => ({ default: m.Navbar })));
+const Footer = lazy(() => import('./components/layout/Footer').then((m) => ({ default: m.Footer })));
+const TrackingBox = lazy(() => import('./components/public/TrackingBox').then((m) => ({ default: m.TrackingBox })));
+const BookingForm = lazy(() => import('./components/public/BookingForm').then((m) => ({ default: m.BookingForm })));
+const QuoteForm = lazy(() => import('./components/public/QuoteForm').then((m) => ({ default: m.QuoteForm })));
+const ServicesSection = lazy(() => import('./components/public/ServicesSection').then((m) => ({ default: m.ServicesSection })));
+const WhyChooseSection = lazy(() => import('./components/public/WhyChooseSection').then((m) => ({ default: m.WhyChooseSection })));
+const DestinationsSection = lazy(() => import('./components/public/DestinationsSection').then((m) => ({ default: m.DestinationsSection })));
+const FleetSection = lazy(() => import('./components/public/FleetSection').then((m) => ({ default: m.FleetSection })));
+const AboutSection = lazy(() => import('./components/public/AboutSection').then((m) => ({ default: m.AboutSection })));
+const ContactSection = lazy(() => import('./components/public/ContactSection').then((m) => ({ default: m.ContactSection })));
+const TestimonialsSection = lazy(() => import('./components/public/TestimonialsSection').then((m) => ({ default: m.TestimonialsSection })));
+const DriverPortal = lazy(() => import('./components/driver/DriverPortal').then((m) => ({ default: m.DriverPortal })));
+const WorkerPortal = lazy(() => import('./components/worker/WorkerPortal').then((m) => ({ default: m.WorkerPortal })));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then((m) => ({ default: m.AdminDashboard })));
+const PublicHome = lazy(() => import('./components/public/PublicHome').then((m) => ({ default: m.PublicHome })));
+
+
+const VALID_VIEWS = new Set([
+  'login', 'change-password', 'admin', 'admin/workforce',
+  'admin/workforce/add-staff', 'admin/workforce/add-driver', 'admin/activity',
+  'driver', 'staff', 'worker', 'book', 'quote', 'track', 'services',
+  'destinations', 'fleet', 'about', 'contact',
+]);
+
+const getInitialView = (): string => {
+  if (typeof window === 'undefined') return 'home';
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const path = window.location.pathname.replace(/^\//, '');
+  const target = hash || path;
+  return VALID_VIEWS.has(target) || target.startsWith('admin/') ? target : 'home';
+};
+
 const AppContent: React.FC = () => {
-  const [currentView, setCurrentView] = useState<string>('home');
+  const [currentView, setCurrentView] = useState<string>(getInitialView);
   const { currentUser, userProfile, role, signOut, isSessionLocked, mustChangePassword } = useAuth();
 
   // Handle URL hash and path routing (e.g. #/login, #/admin, #/driver, #/staff, #/change-password)
   useEffect(() => {
     const handleLocation = () => {
-      const hash = window.location.hash.replace(/^#\/?/, '');
-      const path = window.location.pathname.replace(/^\//, '');
-      const target = hash || path;
-
-      if (
-        [
-          'login',
-          'change-password',
-          'admin',
-          'admin/workforce',
-          'admin/workforce/add-staff',
-          'admin/workforce/add-driver',
-          'admin/activity',
-          'driver',
-          'staff',
-          'worker',
-          'book',
-          'quote',
-          'track',
-          'services',
-          'destinations',
-          'fleet',
-          'about',
-          'contact',
-        ].includes(target) ||
-        target.startsWith('admin/')
-      ) {
-        setCurrentView(target);
-      } else {
-        setCurrentView('home');
-      }
+      setCurrentView(getInitialView());
     };
 
     handleLocation();
@@ -166,6 +152,7 @@ const AppContent: React.FC = () => {
   const isDashboardView = isAdminView || ['driver', 'staff', 'worker'].includes(currentView);
 
   return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-[#060B18] text-slate-200"><span role="status" aria-live="polite">Opening Kirenga Cargo…</span></div>}>
     <div className="min-h-screen flex flex-col bg-[#060B18] text-[#F8FAFC] selection:bg-cyan-500/30 selection:text-cyan-200">
       {/* Inactivity Screen Lock */}
       {isSessionLocked && <SessionLockScreen />}
@@ -251,56 +238,8 @@ const AppContent: React.FC = () => {
               </>
             )}
 
-            {/* VIEW: Public Homepage - Exact 11 Requested Sections */}
-            {currentView === 'home' && (
-              <div>
-                {/* 1. Hero Section */}
-                <Hero onNavigate={navigateTo} />
-
-                {/* 2. About KIRENGA */}
-                <AboutSection />
-
-                {/* 3. Our Services */}
-                <ServicesSection onNavigate={navigateTo} />
-
-                {/* 4. Cargo Tracking */}
-                <section id="tracking" className="py-20 md:py-28 bg-[#360810] border-t border-[#D4A017]/20 relative overflow-hidden">
-                  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center max-w-2xl mx-auto mb-10">
-                      <div className="inline-flex items-center gap-2 text-xs font-couriers uppercase tracking-[0.25em] text-[#E6C76A] font-semibold mb-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4A017]" />
-                        <span>Centralized Transit Telemetry</span>
-                      </div>
-                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white font-['Montserrat'] tracking-tight">
-                        Cargo <span className="text-[#D4A017]">Tracking System</span>
-                      </h2>
-                      <p className="text-sm text-[#F5E6D3]/80 mt-2 font-light">
-                        Real-time status updates and electronic corridor milestone verification across East Africa.
-                      </p>
-                    </div>
-                    <TrackingBox />
-                  </div>
-                </section>
-
-                {/* 5. Destinations / East Africa coverage */}
-                <DestinationsSection onNavigate={navigateTo} />
-
-                {/* 6. Our Fleet */}
-                <FleetSection />
-
-                {/* 7. Why Choose KIRENGA */}
-                <WhyChooseSection onNavigate={navigateTo} />
-
-                {/* 8. How It Works */}
-                <HowItWorksSection onNavigate={navigateTo} />
-
-                {/* 9. Customer Testimonials */}
-                <TestimonialsSection />
-
-                {/* 10. Contact / Booking Section */}
-                <ContactSection onNavigate={navigateTo} />
-              </div>
-            )}
+            {/* Public homepage is loaded only for public entry routes. */}
+            {currentView === 'home' && <PublicHome onNavigate={navigateTo} />}
 
             {/* VIEW: Book Cargo */}
             {currentView === 'book' && (
@@ -381,6 +320,7 @@ const AppContent: React.FC = () => {
         <Footer onNavigate={navigateTo} />
       )}
     </div>
+    </Suspense>
   );
 };
 

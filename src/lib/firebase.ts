@@ -5,7 +5,7 @@ import {
   signOut,
   Auth
 } from 'firebase/auth';
-import { initializeFirestore, getFirestore, doc, getDocFromServer, Firestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore, Firestore } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
 import config from '../../firebase-applet-config.json';
 
@@ -64,23 +64,4 @@ export async function createSecondaryAuthUser(email: string, password: string) {
   }
 
   return userCredential.user;
-}
-
-// Test connection on boot (Firebase Integration Skill best practice)
-if (typeof window !== 'undefined') {
-  (async () => {
-    try {
-      await getDocFromServer(doc(db, 'test', 'connection'));
-    } catch (error: any) {
-      if (
-        error?.code === 'unavailable' ||
-        error?.code === 'permission-denied' ||
-        (error instanceof Error && error.message.includes('the client is offline'))
-      ) {
-        // Expected during initial network negotiation or offline mode
-      } else {
-        console.warn('Firestore connection check notice:', error?.message || error);
-      }
-    }
-  })();
 }

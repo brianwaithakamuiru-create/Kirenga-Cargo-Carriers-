@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [loading, setLoading] = useState(true);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
   const profileCacheRef = useRef(new Map<string, UserProfile>());
+  const profileLoadsRef = useRef(new Map<string, Promise<UserProfile | null>>());
   const persistenceRef = useRef<boolean | null>(null);
 
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
@@ -86,20 +87,36 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const loadProfile = async (uid: string): Promise<UserProfile | null> => {
     const cached = profileCacheRef.current.get(uid);
     if (cached) {
-      setUserProfile(cached);
+      if (auth.currentUser?.uid === uid) setUserProfile(cached);
       return cached;
     }
-    try {
-      const profile = await db.getUserProfile(uid);
-      if (profile) {
-        profileCacheRef.current.set(uid, profile);
-        setUserProfile(profile);
+
+    // Share an in-flight read between the auth listener and the explicit sign-in flow.
+    const pending = profileLoadsRef.current.get(uid);
+    if (pending) return pending;
+
+    const request = db.getUserProfile(uid)
+      .then((profile) => {
+        if (profile) {
+          profileCacheRef.current.set(uid, profile);
+          // A slow response from a previous session must not replace a newer user's profile.
+          if (auth.currentUser?.uid === uid) setUserProfile(profile);
+        }
         return profile;
+      })
+      .catch((err) => {
+        console.error('Error fetching user profile:', err);
+        return null;
+      });
+    profileLoadsRef.current.set(uid, request);
+
+    try {
+      return await request;
+    } finally {
+      if (profileLoadsRef.current.get(uid) === request) {
+        profileLoadsRef.current.delete(uid);
       }
-    } catch (err) {
-      console.error('Error fetching user profile:', err);
     }
-    return null;
   };
 
   const refreshProfile = async () => {
@@ -371,8 +388,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    await setPersistence(auth, browserLocalPersistence);
-    persistenceRef.current = true;
+    // Skip redundant persistence setup once this tab already uses local persistence.
+    if (persistenceRef.current !== true) {
+      await setPersistence(auth, browserLocalPersistence);
+      persistenceRef.current = true;
+    }
 
     let authUser: User;
     try {
