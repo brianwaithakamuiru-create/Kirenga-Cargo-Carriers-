@@ -30,7 +30,7 @@ service cloud.firestore {
 
     function isAdminBootstrapEmail() {
       return isSignedIn() && (
-        request.auth.token.email == 'kirengacargoc@gmail.com' ||
+        request.auth.token.email == 'kirengacargo@gmail.com' ||
         request.auth.token.email == 'kirengacargocariers@gmail.com' ||
         request.auth.token.email == 'kirengacarogocariers@gmail.com' ||
         request.auth.token.email == 'brianwaithakamuiru@gmail.com'
