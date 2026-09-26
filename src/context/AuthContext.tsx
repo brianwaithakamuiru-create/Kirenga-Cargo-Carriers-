@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import {
   User,
   onAuthStateChanged,
@@ -113,7 +113,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               uid: user.uid,
               fullName: 'Kirenga Central Administrator',
               username: user.email?.split('@')[0] || 'admin',
-              email: user.email || 'kirengacargocariers@gmail.com',
+              email: user.email || 'kirengacargoc@gmail.com',
               phone: '+256 700 000 000',
               country: 'Uganda',
               role: 'ADMIN',
@@ -235,10 +235,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
+    const normalizedEmail = emailToUse.toLowerCase();
     const isAdminEmail =
-      emailToUse.toLowerCase() === 'kirengacargocariers@gmail.com' ||
-      emailToUse.toLowerCase() === 'kirengacarogocariers@gmail.com' ||
-      emailToUse.toLowerCase() === 'brianwaithakamuiru@gmail.com';
+      normalizedEmail === 'kirengacargoc@gmail.com' ||
+      normalizedEmail === 'kirengacargocariers@gmail.com' ||
+      normalizedEmail === 'kirengacarogocariers@gmail.com' ||
+      normalizedEmail === 'brianwaithakamuiru@gmail.com';
 
     let authUser: User;
     try {
