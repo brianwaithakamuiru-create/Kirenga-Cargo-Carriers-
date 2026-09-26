@@ -52,11 +52,29 @@ export default async function handler(request: Request, response: Response) {
     const profileSnapshot = await firestore.collection('users').doc(adminUser.uid).get();
     const profile = profileSnapshot.data();
 
-    if (!adminUser.emailVerified) {
-      return response.status(403).json({ error: 'The administrator email account must be verified in Firebase Authentication.' });
-    }
-    if (!profile || String(profile.role || '').toLowerCase() !== 'admin' || String(profile.status || '').toLowerCase() !== 'active') {
-      return response.status(403).json({ error: 'The administrator Firebase profile is missing or inactive.' });
+    if (!profile) {
+      const now = new Date().toISOString();
+      await firestore.collection('users').doc(adminUser.uid).set({
+        id: adminUser.uid,
+        uid: adminUser.uid,
+        fullName: 'Kirenga Central Administrator',
+        username: 'admin',
+        email: adminUser.email || 'kirengacargo@gmail.com',
+        phone: '',
+        country: 'Kenya',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        department: 'Administration',
+        employeeId: 'KCC-ADM-001',
+        mustChangePassword: false,
+        failedLoginAttempts: 0,
+        lastLoginAt: now,
+        workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
+        createdAt: now,
+        updatedAt: now,
+      });
+    } else if (String(profile.role || '').toLowerCase() !== 'admin' || String(profile.status || '').toLowerCase() !== 'active') {
+      return response.status(403).json({ error: 'The administrator Firebase profile is inactive or does not have the ADMIN role.' });
     }
 
     const token = await adminAuth.createCustomToken(adminUser.uid, { role: 'admin' });
