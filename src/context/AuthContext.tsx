@@ -12,6 +12,7 @@ import {
   browserSessionPersistence,
   setPersistence,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithPopup,
   linkWithPopup,
   unlink,
@@ -23,15 +24,18 @@ import { UserProfile, SystemSettings } from '../types';
 interface AuthContextType {
   currentUser: User | null;
   userProfile: UserProfile | null;
-  role: 'admin' | 'worker' | 'driver' | 'staff' | null;
+  role: 'admin' | 'worker' | 'driver' | 'staff' | 'customer' | null;
   status: 'active' | 'inactive' | 'suspended' | 'locked' | null;
   loading: boolean;
   isSessionLocked: boolean;
   mustChangePassword: boolean;
   systemSettings: SystemSettings;
-  signIn: (emailOrUsername: string, pass: string, remember?: boolean) => Promise<UserProfile>;
+  signIn: (emailOrUsername: string, pass: string, remember?: boolean, expectedRole?: 'admin' | 'customer' | 'driver' | 'staff') => Promise<UserProfile>;
   signInWithGoogle: () => Promise<UserProfile>;
+  signInWithAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<UserProfile>;
   linkGoogleAccount: () => Promise<void>;
+  linkAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<void>;
+  registerCustomer: (fullName: string, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   sendPasswordReset: (emailOrUsername: string) => Promise<void>;
   changePassword: (newPass: string, currentPass?: string) => Promise<void>;
@@ -158,7 +162,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   }, [currentUser, isSessionLocked, systemSettings.sessionTimeoutSeconds]);
 
   // Sign In implementation
-  const signIn = async (emailOrUsername: string, pass: string, remember: boolean = true): Promise<UserProfile> => {
+  const signIn = async (emailOrUsername: string, pass: string, remember: boolean = true, expectedRole?: 'admin' | 'customer' | 'driver' | 'staff'): Promise<UserProfile> => {
     const emailToUse = emailOrUsername.trim().toLowerCase();
 
     // Firebase Authentication is the authoritative credential store.
@@ -256,12 +260,44 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           updatedAt: now,
         };
         await db.saveUserProfile(profile);
+      } else if (expectedRole === 'customer') {
+        if (!authUser.emailVerified) {
+          await sendEmailVerification(authUser).catch(() => {});
+          await firebaseSignOut(auth);
+          throw new Error('Verify your email address before opening your client account. Check your inbox, then sign in again.');
+        }
+        const now = new Date().toISOString();
+        profile = {
+          id: authUser.uid,
+          uid: authUser.uid,
+          fullName: authUser.displayName || authUser.email?.split('@')[0] || 'Client',
+          username: authUser.email?.split('@')[0] || undefined,
+          email: authUser.email || emailToUse,
+          role: 'CUSTOMER',
+          status: 'ACTIVE',
+          customerId: authUser.uid,
+          mustChangePassword: false,
+          createdAt: now,
+          updatedAt: now,
+        };
+        await db.saveUserProfile(profile);
       } else {
         throw new Error('User profile record not found in database. Contact administrator.');
       }
     }
 
     // Existing profile role and status stay authoritative; bootstrap emails do not override them.
+
+    const actualRole = (profile.role || '').toLowerCase();
+    const roleMatches = !expectedRole || (expectedRole === 'staff'
+      ? ['staff', 'worker', 'operations', 'finance', 'support'].includes(actualRole)
+      : actualRole === expectedRole);
+    if (!roleMatches) {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('This account belongs to a different workplace. Select the matching portal and sign in again.');
+    }
 
     // Strict Account Status Verification
     const statusNormalized = (profile.status || 'ACTIVE').toLowerCase();
@@ -383,6 +419,65 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return profile;
   };
 
+  const signInWithAdminProvider = async (providerId: 'apple.com' | 'microsoft.com'): Promise<UserProfile> => {
+    const provider = new OAuthProvider(providerId);
+    provider.setCustomParameters({ prompt: 'select_account' });
+    if (providerId === 'apple.com') provider.addScope('email');
+    await setPersistence(auth, browserLocalPersistence);
+    persistenceRef.current = true;
+
+    let authUser: User;
+    try {
+      authUser = (await signInWithPopup(auth, provider)).user;
+    } catch (err: any) {
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        throw new Error('This identity is not linked to the administrator account yet. Sign in with the current administrator method and link it under Admin Security.');
+      }
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        throw new Error('Sign-in was cancelled.');
+      }
+      throw new Error(err.message || 'Administrator identity sign-in failed.');
+    }
+
+    const profile = await db.getUserProfile(authUser.uid);
+    if (!authUser.emailVerified || !profile || profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('This identity must be linked to an active administrator account before it can sign in.');
+    }
+
+    profileCacheRef.current.set(authUser.uid, profile);
+    setCurrentUser(authUser);
+    setUserProfile(profile);
+    setIsSessionLocked(false);
+    void db.logAudit({
+      actorUid: authUser.uid,
+      actorRole: profile.role,
+      action: 'USER_LOGIN',
+      targetUid: authUser.uid,
+      details: 'Administrator signed in with ' + (providerId === 'apple.com' ? 'Apple' : 'Microsoft') + '.',
+    }).catch(() => {});
+    return profile;
+  };
+
+  const registerCustomer = async (fullName: string, email: string, password: string): Promise<void> => {
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanName || !cleanEmail || password.length < 8) {
+      throw new Error('Enter your name, a valid email, and a password of at least 8 characters.');
+    }
+    const credential = await createUserWithEmailAndPassword(auth, cleanEmail, password);
+    try {
+      await updateProfile(credential.user, { displayName: cleanName });
+      await sendEmailVerification(credential.user);
+    } finally {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+    }
+  };
+
   const linkGoogleAccount = async (): Promise<void> => {
     const user = auth.currentUser;
     if (!user || user.email?.toLowerCase() !== 'kirengacargo@gmail.com'
@@ -412,6 +507,25 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       action: 'GOOGLE_PROVIDER_LINKED',
       targetUid: user.uid,
       details: 'Administrator linked Google sign-in to the existing account.',
+    }).catch(() => {});
+  };
+
+  const linkAdminProvider = async (providerId: 'apple.com' | 'microsoft.com'): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user || userProfile?.role?.toLowerCase() !== 'admin' || userProfile.status?.toLowerCase() !== 'active') {
+      throw new Error('Sign in as the active administrator before linking another provider.');
+    }
+    if (user.providerData.some((item) => item.providerId === providerId)) return;
+    const provider = new OAuthProvider(providerId);
+    provider.setCustomParameters({ prompt: 'select_account' });
+    if (providerId === 'apple.com') provider.addScope('email');
+    await linkWithPopup(user, provider);
+    await db.logAudit({
+      actorUid: user.uid,
+      actorRole: userProfile.role,
+      action: 'ADMIN_PROVIDER_LINKED',
+      targetUid: user.uid,
+      details: 'Administrator linked ' + (providerId === 'apple.com' ? 'Apple' : 'Microsoft') + ' sign-in.',
     }).catch(() => {});
   };
 
@@ -545,6 +659,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     if (r === 'admin') return 'admin';
     if (r === 'driver') return 'driver';
     if (r === 'staff') return 'staff';
+    if (r === 'customer') return 'customer';
     return 'worker';
   };
 
@@ -574,7 +689,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         systemSettings,
         signIn,
         signInWithGoogle,
+        signInWithAdminProvider,
         linkGoogleAccount,
+        linkAdminProvider,
+        registerCustomer,
         signOut,
         sendPasswordReset,
         changePassword,
