@@ -126,6 +126,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [notificationMsg, setNotificationMsg] = useState<string | null>(null);
+  const triggerToast = (message: string) => {
+    setNotificationMsg(message);
+    window.setTimeout(() => setNotificationMsg(null), 4000);
+  };
 
   // Global search state
   const [globalSearch, setGlobalSearch] = useState('');
