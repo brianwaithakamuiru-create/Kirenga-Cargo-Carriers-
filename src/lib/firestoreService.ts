@@ -257,16 +257,13 @@ class FirestoreService {
   // --- Workforce & Users Management ---
 
   public async getUserProfile(uid: string): Promise<UserProfile | null> {
-    try {
-      const snap = await getDoc(doc(firestore, COLLECTIONS.USERS, uid));
-      if (snap.exists()) {
-        return { ...snap.data(), id: snap.id, uid: snap.id } as UserProfile;
-      }
-    } catch (err) {
-      console.warn('Error reading user profile:', err);
+    // Authentication/authorization must never fall back to browser localStorage.
+    // The Firestore profile is the authoritative role and account-status record.
+    const snap = await getDoc(doc(firestore, COLLECTIONS.USERS, uid));
+    if (snap.exists()) {
+      return { ...snap.data(), id: snap.id, uid: snap.id } as UserProfile;
     }
-    const local = this.readCollection<UserProfile>(COLLECTIONS.USERS);
-    return local.find((u) => u.uid === uid || u.id === uid) || null;
+    return null;
   }
 
   public async getUserByUsername(username: string): Promise<UserProfile | null> {
@@ -298,11 +295,8 @@ class FirestoreService {
       createdAt: profile.createdAt || now,
       updatedAt: now,
     };
-    try {
-      await setDoc(doc(firestore, COLLECTIONS.USERS, uid), docData);
-    } catch (err) {
-      console.warn('Error saving user profile to Firestore:', err);
-    }
+    // Never report a successful security-sensitive write when Firestore rejected it.
+    await setDoc(doc(firestore, COLLECTIONS.USERS, uid), docData);
     const items = this.readCollection<UserProfile>(COLLECTIONS.USERS);
     const idx = items.findIndex((u) => u.uid === uid);
     if (idx !== -1) items[idx] = docData;
@@ -312,11 +306,8 @@ class FirestoreService {
 
   public async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<void> {
     const now = new Date().toISOString();
-    try {
-      await updateDoc(doc(firestore, COLLECTIONS.USERS, uid), { ...updates, updatedAt: now });
-    } catch (err) {
-      console.warn('Error updating user profile in Firestore:', err);
-    }
+    // Never silently fall back to localStorage for role/status changes.
+    await updateDoc(doc(firestore, COLLECTIONS.USERS, uid), { ...updates, updatedAt: now });
     const items = this.readCollection<UserProfile>(COLLECTIONS.USERS);
     const idx = items.findIndex((u) => u.uid === uid);
     if (idx !== -1) {
