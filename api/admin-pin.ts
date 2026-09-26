@@ -23,10 +23,6 @@ function getAdminApp() {
 
 function getHeader(request: Request, name: string) { const value = request.headers?.[name] ?? request.headers?.[name.toLowerCase()]; return Array.isArray(value) ? value[0] : value; }
 
-function safeEqual(a: string, b: string) {
-  return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
-}
-
 function getBearerToken(request: Request) {
   const authorization = getHeader(request, 'authorization') || getHeader(request, 'Authorization');
   if (!authorization) return null;
@@ -36,7 +32,7 @@ function getBearerToken(request: Request) {
 
 function verifyScryptPin(pin: string, encodedHash: string) {
   const parts = encodedHash.split('$');
-  if (parts.length !== 7 || parts[0] !== 'scrypt') return false;
+  if (parts.length !== 6 || parts[0] !== 'scrypt') return false;
 
   const n = Number(parts[1]);
   const r = Number(parts[2]);
@@ -58,7 +54,7 @@ function verifyScryptPin(pin: string, encodedHash: string) {
   }
 }
 
-async function writePinAudit(firestore: FirebaseFirestore.Firestore, data: Record<string, unknown>) {
+async function writePinAudit(firestore: ReturnType<typeof getFirestore>, data: Record<string, unknown>) {
   try {
     await firestore.collection('adminPinAudit').add({
       ...data,
