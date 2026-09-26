@@ -1,5 +1,6 @@
 import {
   Shipment,
+  PublicShipmentTracking,
   Trip,
   TripStatus,
   Driver,
@@ -45,11 +46,13 @@ import {
   where,
   orderBy,
   onSnapshot,
+  writeBatch,
 } from 'firebase/firestore';
 
 // Collection names in Firestore
 export const COLLECTIONS = {
   SHIPMENTS: 'shipments',
+  PUBLIC_TRACKING: 'publicTracking',
   TRIPS: 'trips',
   DRIVERS: 'drivers',
   VEHICLES: 'vehicles',
@@ -106,30 +109,32 @@ function notifySubscribers(col: string) {
 // Persistent Real-Time Firestore Service
 // Strictly NO fake/seed data: starts empty if not populated by user/admin actions.
 class FirestoreService {
-  private getStorageKey(col: string): string {
-    return `kcc_firestore_${col}`;
+  // Never persist customer, workforce, or shipment records in browser storage.
+  private readCollection<T>(_col: string): T[] {
+    return [];
   }
 
-  private readCollection<T>(col: string): T[] {
-    if (typeof window === 'undefined') return [];
-    try {
-      const data = localStorage.getItem(this.getStorageKey(col));
-      if (!data) return [];
-      return JSON.parse(data) as T[];
-    } catch (e) {
-      console.error(`Error reading collection ${col}:`, e);
-      return [];
-    }
+  private writeCollection<T>(col: string, _items: T[]): void {
+    notifySubscribers(col);
   }
 
-  private writeCollection<T>(col: string, items: T[]): void {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem(this.getStorageKey(col), JSON.stringify(items));
-      notifySubscribers(col);
-    } catch (e) {
-      console.error(`Error writing collection ${col}:`, e);
-    }
+  private toPublicTracking(shipment: Shipment): PublicShipmentTracking {
+    return {
+      id: shipment.shipmentNumber,
+      shipmentNumber: shipment.shipmentNumber,
+      status: shipment.status,
+      originCountry: shipment.originCountry || 'Unknown',
+      originCity: shipment.originCity || 'Unknown',
+      destinationCountry: shipment.destinationCountry || 'Unknown',
+      destinationCity: shipment.destinationCity || 'Unknown',
+      cargoType: shipment.cargoType || 'General cargo',
+      weightKg: Number(shipment.weightKg) || 0,
+      pickupDate: shipment.pickupDate,
+      expectedDelivery: shipment.expectedDelivery,
+      actualDelivery: shipment.actualDelivery,
+      createdAt: shipment.createdAt,
+      updatedAt: shipment.updatedAt,
+    };
   }
 
   // Subscribe to real-time changes
@@ -155,11 +160,9 @@ class FirestoreService {
       }
     };
     window.addEventListener(SYNC_EVENT, handler);
-    window.addEventListener('storage', handler);
     return () => {
       if (firestoreUnsub) firestoreUnsub();
       window.removeEventListener(SYNC_EVENT, handler);
-      window.removeEventListener('storage', handler);
     };
   }
 
@@ -178,8 +181,8 @@ class FirestoreService {
         return [];
       }
     } catch (err) {
-      // Return cached local collection if offline
-      return this.readCollection<T>(col);
+      console.warn(`Firestore read failed for ${col}:`, err);
+      return [];
     }
   }
 
@@ -190,10 +193,21 @@ class FirestoreService {
         return { ...snap.data(), id: snap.id } as T;
       }
     } catch (err) {
-      // fallback
+      console.warn(`Firestore read failed for ${col}/${id}:`, err);
     }
-    const items = this.readCollection<T>(col);
-    return items.find((item) => item.id === id) || null;
+    return null;
+  }
+
+  public async set<T = any>(col: string, id: string, item: T): Promise<void> {
+    const now = new Date().toISOString();
+    const data = {
+      createdAt: (item as any).createdAt || now,
+      updatedAt: (item as any).updatedAt || now,
+      ...(item as any),
+      id,
+    };
+    await setDoc(doc(firestore, col, id), data);
+    this.writeCollection(col, []);
   }
 
   public async add<T = any>(
@@ -209,49 +223,63 @@ class FirestoreService {
       id,
     } as unknown as T;
 
-    try {
+    if (col === COLLECTIONS.SHIPMENTS) {
+      const shipment = newItem as unknown as Shipment;
+      const batch = writeBatch(firestore);
+      batch.set(doc(firestore, col, id), newItem as any);
+      batch.set(
+        doc(firestore, COLLECTIONS.PUBLIC_TRACKING, shipment.shipmentNumber),
+        this.toPublicTracking(shipment) as any
+      );
+      await batch.commit();
+    } else {
       await setDoc(doc(firestore, col, id), newItem as any);
-    } catch (err) {
-      console.warn(`Firestore write warning for ${col}:`, err);
     }
 
-    const items = this.readCollection<T>(col);
-    items.unshift(newItem);
-    this.writeCollection(col, items);
+    this.writeCollection(col, []);
     return newItem;
   }
 
   public async update<T extends { id?: string }>(col: string, id: string, updates: Partial<T> | any): Promise<T> {
     const now = new Date().toISOString();
-    try {
-      await updateDoc(doc(firestore, col, id), { ...updates, updatedAt: now });
-    } catch (err) {
-      console.warn(`Firestore update warning for ${col}:`, err);
+    const ref = doc(firestore, col, id);
+    const snapshot = await getDoc(ref);
+    if (!snapshot.exists()) {
+      throw new Error(`Cannot update missing ${col} record ${id}.`);
     }
 
-    const items = this.readCollection<T>(col);
-    const index = items.findIndex((i) => i.id === id);
-    if (index === -1) {
-      const newItem = { id, ...updates, updatedAt: now } as unknown as T;
-      items.unshift(newItem);
-      this.writeCollection(col, items);
-      return newItem;
+    const updated = { ...snapshot.data(), ...updates, id, updatedAt: now } as unknown as T;
+    if (col === COLLECTIONS.SHIPMENTS) {
+      const shipment = updated as unknown as Shipment;
+      const batch = writeBatch(firestore);
+      batch.update(ref, { ...updates, updatedAt: now });
+      batch.set(
+        doc(firestore, COLLECTIONS.PUBLIC_TRACKING, shipment.shipmentNumber),
+        this.toPublicTracking(shipment) as any
+      );
+      await batch.commit();
+    } else {
+      await updateDoc(ref, { ...updates, updatedAt: now });
     }
-    const updated = { ...items[index], ...updates, updatedAt: now };
-    items[index] = updated;
-    this.writeCollection(col, items);
+
+    this.writeCollection(col, []);
     return updated;
   }
 
   public async delete(col: string, id: string): Promise<void> {
-    try {
+    if (col === COLLECTIONS.SHIPMENTS) {
+      const snapshot = await getDoc(doc(firestore, col, id));
+      const batch = writeBatch(firestore);
+      batch.delete(doc(firestore, col, id));
+      if (snapshot.exists()) {
+        const shipment = { ...snapshot.data(), id: snapshot.id } as Shipment;
+        batch.delete(doc(firestore, COLLECTIONS.PUBLIC_TRACKING, shipment.shipmentNumber));
+      }
+      await batch.commit();
+    } else {
       await deleteDoc(doc(firestore, col, id));
-    } catch (err) {
-      console.warn(`Firestore delete warning for ${col}:`, err);
     }
-    const items = this.readCollection<{ id: string }>(col);
-    const filtered = items.filter((i) => i.id !== id);
-    this.writeCollection(col, filtered);
+    this.writeCollection(col, []);
   }
 
   // --- Workforce & Users Management ---
@@ -297,23 +325,14 @@ class FirestoreService {
     };
     // Never report a successful security-sensitive write when Firestore rejected it.
     await setDoc(doc(firestore, COLLECTIONS.USERS, uid), docData);
-    const items = this.readCollection<UserProfile>(COLLECTIONS.USERS);
-    const idx = items.findIndex((u) => u.uid === uid);
-    if (idx !== -1) items[idx] = docData;
-    else items.unshift(docData);
-    this.writeCollection(COLLECTIONS.USERS, items);
+    this.writeCollection(COLLECTIONS.USERS, []);
   }
 
   public async updateUserProfile(uid: string, updates: Partial<UserProfile>): Promise<void> {
     const now = new Date().toISOString();
     // Never silently fall back to localStorage for role/status changes.
     await updateDoc(doc(firestore, COLLECTIONS.USERS, uid), { ...updates, updatedAt: now });
-    const items = this.readCollection<UserProfile>(COLLECTIONS.USERS);
-    const idx = items.findIndex((u) => u.uid === uid);
-    if (idx !== -1) {
-      items[idx] = { ...items[idx], ...updates, updatedAt: now };
-      this.writeCollection(COLLECTIONS.USERS, items);
-    }
+    this.writeCollection(COLLECTIONS.USERS, []);
   }
 
   public async getAllUsers(): Promise<UserProfile[]> {
@@ -411,11 +430,28 @@ class FirestoreService {
 
   // --- Specific Business Operations ---
 
-  // Tracking query: find shipment by exact shipmentNumber
-  public async getShipmentByNumber(shipmentNumber: string): Promise<Shipment | null> {
+  // Fetch only the sanitized tracking record for the exact waybill provided by a customer.
+  public async getShipmentByNumber(shipmentNumber: string): Promise<PublicShipmentTracking | null> {
     const cleaned = shipmentNumber.trim().toUpperCase();
-    const shipments = await this.getAll<Shipment>(COLLECTIONS.SHIPMENTS);
-    return shipments.find((s) => s.shipmentNumber.toUpperCase() === cleaned) || null;
+    if (!cleaned) return null;
+    const snapshot = await getDoc(doc(firestore, COLLECTIONS.PUBLIC_TRACKING, cleaned));
+    return snapshot.exists()
+      ? ({ ...snapshot.data(), id: snapshot.id } as PublicShipmentTracking)
+      : null;
+  }
+
+  public subscribeShipmentTracking(
+    shipmentNumber: string,
+    callback: (shipment: PublicShipmentTracking | null) => void
+  ): () => void {
+    const cleaned = shipmentNumber.trim().toUpperCase();
+    return onSnapshot(
+      doc(firestore, COLLECTIONS.PUBLIC_TRACKING, cleaned),
+      (snapshot) => callback(snapshot.exists()
+        ? ({ ...snapshot.data(), id: snapshot.id } as PublicShipmentTracking)
+        : null),
+      () => callback(null)
+    );
   }
 
   // Create Booking — optimized for fast customer submission

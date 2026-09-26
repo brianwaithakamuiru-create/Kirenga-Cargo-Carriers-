@@ -26,16 +26,14 @@ export const app: FirebaseApp = !getApps().length
 // Primary Auth instance for current active user session
 export const auth: Auth = getAuth(app);
 
-// Firestore instance connected to the dedicated database ID with auto-detect long-polling for proxy/iframe stability
+// Firestore instance for the project's default database with auto-detect long-polling
 export const db: Firestore = (() => {
   try {
     return initializeFirestore(app, {
       experimentalAutoDetectLongPolling: true,
-    }, config.firestoreDatabaseId || undefined);
+    });
   } catch {
-    return config.firestoreDatabaseId
-      ? getFirestore(app, config.firestoreDatabaseId)
-      : getFirestore(app);
+    return getFirestore(app);
   }
 })();
 

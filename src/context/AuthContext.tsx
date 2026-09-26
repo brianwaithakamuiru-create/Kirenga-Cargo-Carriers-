@@ -6,10 +6,15 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updatePassword as firebaseUpdatePassword,
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
+  GoogleAuthProvider,
+  signInWithPopup,
+  linkWithPopup,
+  unlink,
 } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 import { db } from '../lib/firestoreService';
@@ -25,6 +30,8 @@ interface AuthContextType {
   mustChangePassword: boolean;
   systemSettings: SystemSettings;
   signIn: (emailOrUsername: string, pass: string, remember?: boolean) => Promise<UserProfile>;
+  signInWithGoogle: () => Promise<UserProfile>;
+  linkGoogleAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   sendPasswordReset: (emailOrUsername: string) => Promise<void>;
   changePassword: (newPass: string, currentPass?: string) => Promise<void>;
@@ -169,12 +176,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const normalizedEmail = emailToUse;
-    const isAdminEmail =
-      normalizedEmail === 'kirengacargo@gmail.com' ||
-      normalizedEmail === 'kirengacargoc@gmail.com' ||
-      normalizedEmail === 'kirengacargocariers@gmail.com' ||
-      normalizedEmail === 'kirengacarogocariers@gmail.com' ||
-      normalizedEmail === 'brianwaithakamuiru@gmail.com';
+    const isAdminEmail = normalizedEmail === 'kirengacargo@gmail.com';
 
     let authUser: User;
     try {
@@ -188,38 +190,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (isAdminEmail && (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential')) {
         try {
           const newCred = await createUserWithEmailAndPassword(auth, emailToUse, pass);
-          authUser = newCred.user;
-          // Create the admin user profile in Firestore
-          const now = new Date().toISOString();
-          const adminDoc: UserProfile = {
-            id: authUser.uid,
-            uid: authUser.uid,
-            fullName: 'Kirenga Central Administrator',
-            username: emailToUse.split('@')[0],
-            email: emailToUse,
-            phone: '+256 700 000 000',
-            country: 'Uganda',
-            role: 'ADMIN',
-            status: 'ACTIVE',
-            department: 'Administration',
-            employeeId: 'KCC-ADM-001',
-            mustChangePassword: false,
-            failedLoginAttempts: 0,
-            lastLoginAt: now,
-            workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
-            createdAt: now,
-            updatedAt: now,
-          };
-          await db.saveUserProfile(adminDoc);
-          setUserProfile(adminDoc);
-          await db.logAudit({
-            actorUid: authUser.uid,
-            actorRole: 'ADMIN',
-            action: 'INITIAL_ADMIN_BOOTSTRAP',
-            targetUid: authUser.uid,
-            details: 'Initial administrator account securely initialized via Firebase Authentication.',
-          });
-          return adminDoc;
+          await sendEmailVerification(newCred.user);
+          await firebaseSignOut(auth);
+          throw new Error('A verification email was sent to the administrator address. Verify it, then sign in again to finish setup.');
         } catch (bootstrapErr: any) {
           if (bootstrapErr.code === 'auth/email-already-in-use') {
             throw new Error('Incorrect credentials. Please verify your email/username and password.');
@@ -257,6 +230,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If profile document does not exist yet for bootstrapped admin
     if (!profile) {
       if (isAdminEmail) {
+        if (!authUser.emailVerified) {
+          await sendEmailVerification(authUser).catch(() => {});
+          await firebaseSignOut(auth);
+          throw new Error('Verify the administrator email address before initializing its profile. Check your inbox, then sign in again.');
+        }
         const now = new Date().toISOString();
         profile = {
           id: authUser.uid,
@@ -283,12 +261,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
-    // Ensure ADMIN role for administrator email
-    if (isAdminEmail && (profile.role !== 'ADMIN' || profile.status !== 'ACTIVE')) {
-      await db.updateUserProfile(authUser.uid, { role: 'ADMIN', status: 'ACTIVE' });
-      profile.role = 'ADMIN';
-      profile.status = 'ACTIVE';
-    }
+    // Existing profile role and status stay authoritative; bootstrap emails do not override them.
 
     // Strict Account Status Verification
     const statusNormalized = (profile.status || 'ACTIVE').toLowerCase();
@@ -315,6 +288,131 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }).catch(() => {});
 
     return profile;
+  };
+
+  const signInWithGoogle = async (): Promise<UserProfile> => {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      login_hint: 'kirengacargo@gmail.com',
+      prompt: 'select_account',
+    });
+
+    await setPersistence(auth, browserLocalPersistence);
+    persistenceRef.current = true;
+
+    let authUser: User;
+    try {
+      const credential = await signInWithPopup(auth, provider);
+      authUser = credential.user;
+    } catch (err: any) {
+      if (err.code === 'auth/account-exists-with-different-credential') {
+        throw new Error(
+          'This administrator account already uses email and password. Sign in with that method once, then link Google under Admin Security → Password. If needed, use Forgot Password first.'
+        );
+      }
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+        throw new Error('Google sign-in was cancelled.');
+      }
+      throw new Error(err.message || 'Google sign-in failed. Please try again.');
+    }
+
+    if (authUser.email?.toLowerCase() !== 'kirengacargo@gmail.com') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('Use the Google account registered for the Kirenga Cargo administrator.');
+    }
+
+    if (!authUser.emailVerified) {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('The administrator Google account must have a verified email address.');
+    }
+
+    let profile = await loadProfile(authUser.uid);
+    if (!profile) {
+      const now = new Date().toISOString();
+      profile = {
+        id: authUser.uid,
+        uid: authUser.uid,
+        fullName: authUser.displayName || 'Kirenga Central Administrator',
+        username: (authUser.email || 'kirengacargo@gmail.com').split('@')[0],
+        email: authUser.email || 'kirengacargo@gmail.com',
+        phone: '',
+        country: 'Kenya',
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        department: 'Administration',
+        employeeId: 'KCC-ADM-001',
+        mustChangePassword: false,
+        failedLoginAttempts: 0,
+        lastLoginAt: now,
+        workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
+        createdAt: now,
+        updatedAt: now,
+      };
+      try {
+        await db.saveUserProfile(profile);
+      } catch (err) {
+        await firebaseSignOut(auth);
+        setCurrentUser(null);
+        setUserProfile(null);
+        throw err;
+      }
+    }
+
+    if (profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
+      await firebaseSignOut(auth);
+      setCurrentUser(null);
+      setUserProfile(null);
+      throw new Error('This Google account does not have an active Kirenga Cargo administrator profile.');
+    }
+
+    profileCacheRef.current.set(authUser.uid, profile);
+    setCurrentUser(authUser);
+    setUserProfile(profile);
+    setIsSessionLocked(false);
+    void db.logAudit({
+      actorUid: authUser.uid,
+      actorRole: profile.role || 'ADMIN',
+      action: 'USER_LOGIN',
+      targetUid: authUser.uid,
+      details: 'Administrator signed in with Google.',
+    }).catch(() => {});
+    return profile;
+  };
+
+  const linkGoogleAccount = async (): Promise<void> => {
+    const user = auth.currentUser;
+    if (!user || user.email?.toLowerCase() !== 'kirengacargo@gmail.com'
+        || userProfile?.role?.toLowerCase() !== 'admin'
+        || userProfile.status?.toLowerCase() !== 'active') {
+      throw new Error('Sign in as the active Kirenga Cargo administrator before linking Google.');
+    }
+    if (user.providerData.some((item) => item.providerId === 'google.com')) {
+      return;
+    }
+
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({
+      login_hint: user.email,
+      prompt: 'select_account',
+    });
+    const result = await linkWithPopup(user, provider);
+    const googleEmail = result.user.providerData.find((item) => item.providerId === 'google.com')?.email?.toLowerCase();
+    if (googleEmail !== user.email.toLowerCase()) {
+      await unlink(result.user, 'google.com');
+      throw new Error('Choose the same administrator email address when linking Google.');
+    }
+
+    await db.logAudit({
+      actorUid: user.uid,
+      actorRole: userProfile.role,
+      action: 'GOOGLE_PROVIDER_LINKED',
+      targetUid: user.uid,
+      details: 'Administrator linked Google sign-in to the existing account.',
+    }).catch(() => {});
   };
 
   // Sign Out
@@ -475,6 +573,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         mustChangePassword,
         systemSettings,
         signIn,
+        signInWithGoogle,
+        linkGoogleAccount,
         signOut,
         sendPasswordReset,
         changePassword,

@@ -34,6 +34,7 @@ import {
   DriverCommandKey,
 } from '../../types';
 import { CommandCenterBackground } from '../common/CommandCenterBackground';
+import { CompanyLogo } from '../common/CompanyLogo';
 import { db } from '../../lib/firestoreService';
 
 export const WorkplaceAppearanceControl: React.FC = () => {

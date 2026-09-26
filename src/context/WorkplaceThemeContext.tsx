@@ -219,7 +219,7 @@ export const WorkplaceThemeProvider: React.FC<{ children: React.ReactNode }> = (
 
   const loadSettings = useCallback(async () => {
     try {
-      const data = await db.get<WorkplaceAppearanceSettings>(COLLECTIONS.COMPANY_SETTINGS, 'workplace_appearance');
+      const data = await db.getById<WorkplaceAppearanceSettings>(COLLECTIONS.COMPANY_SETTINGS, 'workplace_appearance');
       if (data) {
         setSettings({
           ...DEFAULT_WORKPLACE_SETTINGS,
@@ -232,7 +232,7 @@ export const WorkplaceThemeProvider: React.FC<{ children: React.ReactNode }> = (
       }
 
       // Load user command permissions
-      const perms = await db.getAll<UserCommandPermissions>('workplacePermissions');
+      const perms = await db.getAll<UserCommandPermissions & { id: string }>('workplacePermissions');
       const permMap: Record<string, UserCommandPermissions> = {};
       perms.forEach((p) => {
         if (p.userId) permMap[p.userId] = p;

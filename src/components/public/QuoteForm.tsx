@@ -41,9 +41,8 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({ onSuccess }) => {
 
     setLoading(true);
     try {
-      const quotes = await db.getAll<Quote>(COLLECTIONS.QUOTES);
       const year = new Date().getFullYear();
-      const quoteReference = `KCC-QT-${year}-${String(quotes.length + 1).padStart(4, '0')}`;
+      const quoteReference = `KCC-QT-${year}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
       // Calculate an initial estimated transport rate based on weight and corridor
       const baseRate = formData.currency === 'USD' ? 2400 : 310000;
@@ -73,14 +72,8 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({ onSuccess }) => {
 
       const saved = await db.add<Quote>(COLLECTIONS.QUOTES, quote);
 
-      await db.logActivity({
-        action: 'Quotation Requested',
-        actor: quote.customerName,
-        role: 'CUSTOMER',
-        relatedRecordType: 'BOOKING',
-        relatedRecordId: saved.id,
-        details: `Quote ${quoteReference} created for ${quote.origin} to ${quote.destination}`,
-      });
+      // The quote record is the durable request. Public clients cannot write
+      // internal activity logs, so do not turn a successful quote into a UI error.
 
       setSubmitted(saved);
       if (onSuccess) onSuccess();
