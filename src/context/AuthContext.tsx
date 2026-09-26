@@ -202,9 +202,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         emailToUse = prospectiveUser.email;
       }
     } else {
-      // Check if user exists by email for status checks
-      const allUsers = await db.getAllUsers();
-      prospectiveUser = allUsers.find(u => u.email.toLowerCase() === input.toLowerCase()) || null;
+      // Firebase Authentication validates the email directly. Avoid downloading
+      // the entire workforce collection just to perform a pre-auth status check.
+      // The authoritative Firestore profile is loaded immediately after auth succeeds.
+      prospectiveUser = null;
     }
 
     // Pre-auth status check if user profile exists
@@ -225,6 +226,19 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const cred = await signInWithEmailAndPassword(auth, emailToUse, pass);
       authUser = cred.user;
     } catch (authErr: any) {
+      // Failed-attempt tracking is only needed after an authentication failure.
+      // Keep the successful-login path free of a full users collection read.
+      if (!prospectiveUser && !isAdminEmail) {
+        try {
+          const allUsers = await db.getAllUsers();
+          prospectiveUser = allUsers.find(
+            u => u.email.toLowerCase() === emailToUse.toLowerCase()
+          ) || null;
+        } catch {
+          prospectiveUser = null;
+        }
+      }
+
       // Check for Initial Administrator account bootstrap
       if (isAdminEmail && (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential')) {
         try {
@@ -362,26 +376,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error('Your account is currently unavailable. Contact the Kirenga Cargo Carriers administrator.');
     }
 
-    // Reset failed login attempts and update lastLoginAt on successful login
+    // Update local state immediately. These bookkeeping writes are non-critical
+    // to the user's navigation and therefore run in the background.
     const nowIso = new Date().toISOString();
-    await db.updateUserProfile(authUser.uid, {
-      failedLoginAttempts: 0,
-      lastLoginAt: nowIso,
-    });
     profile.failedLoginAttempts = 0;
     profile.lastLoginAt = nowIso;
-
-    // Audit Log
-    await db.logAudit({
-      actorUid: authUser.uid,
-      actorRole: profile.role || 'USER',
-      action: 'USER_LOGIN',
-      targetUid: authUser.uid,
-      details: `Successful sign-in with role ${profile.role} from ${profile.country || 'East Africa'}`,
-    });
-
     setUserProfile(profile);
     setIsSessionLocked(false);
+
+    void Promise.all([
+      db.updateUserProfile(authUser.uid, {
+        failedLoginAttempts: 0,
+        lastLoginAt: nowIso,
+      }),
+      db.logAudit({
+        actorUid: authUser.uid,
+        actorRole: profile.role || 'USER',
+        action: 'USER_LOGIN',
+        targetUid: authUser.uid,
+        details: `Successful sign-in with role ${profile.role} from ${profile.country || 'East Africa'}`,
+      }),
+    ]).catch((err) => {
+      console.warn('Post-login bookkeeping completed with a non-blocking error:', err);
+    });
+
     return profile;
   };
 
