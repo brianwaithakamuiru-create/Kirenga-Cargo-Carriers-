@@ -66,15 +66,15 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
   const [routeForm, setRouteForm] = useState({
     routeCode: '',
     routeName: '',
-    originCountry: 'Kenya',
-    originCity: 'Mombasa Port',
-    destinationCountry: 'Uganda',
-    destinationCity: 'Kampala',
-    distanceKm: 1170,
-    estimatedTransitDays: 3,
-    borderCrossings: 'Busia, Malaba',
+    originCountry: '',
+    originCity: '',
+    destinationCountry: '',
+    destinationCity: '',
+    distanceKm: 0,
+    estimatedTransitDays: 0,
+    borderCrossings: '',
     active: true,
-    notes: 'Northern Corridor main arterial trunk road.',
+    notes: '',
   });
 
   const [checkpointForm, setCheckpointForm] = useState({
@@ -156,6 +156,13 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
   // Handlers
   const handleAddRoute = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!routeForm.routeName.trim() || !routeForm.originCountry.trim() ||
+        !routeForm.originCity.trim() || !routeForm.destinationCountry.trim() ||
+        !routeForm.destinationCity.trim() || routeForm.distanceKm <= 0 ||
+        routeForm.estimatedTransitDays <= 0) {
+      showToast('Enter a route name, both locations, a positive distance, and estimated travel days.');
+      return;
+    }
     try {
       const code =
         routeForm.routeCode.trim().toUpperCase() ||
@@ -164,7 +171,7 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
       const newR = await db.add<LogisticsRoute>(COLLECTIONS.ROUTES, {
         ...routeForm,
         routeCode: code,
-        borderCrossings: routeForm.borderCrossings.split(',').map((s) => s.trim()),
+        borderCrossings: routeForm.borderCrossings.split(',').map((s) => s.trim()).filter(Boolean),
         displayOrder: routes.length + 1,
       });
 
@@ -669,18 +676,8 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">Origin Country</label>
-                  <select
-                    value={routeForm.originCountry}
-                    onChange={(e) => setRouteForm({ ...routeForm, originCountry: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
-                  >
-                    <option value="Kenya">Kenya</option>
-                    <option value="Uganda">Uganda</option>
-                    <option value="Tanzania">Tanzania</option>
-                    <option value="Rwanda">Rwanda</option>
-                    <option value="DR Congo">DR Congo</option>
-                  </select>
+                  <label className="block text-slate-300 mb-1">Origin Country *</label>
+                  <input type="text" required maxLength={80} value={routeForm.originCountry} onChange={(e) => setRouteForm({ ...routeForm, originCountry: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white" />
                 </div>
                 <div>
                   <label className="block text-slate-300 mb-1">Origin City / Hub *</label>
@@ -696,18 +693,8 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-slate-300 mb-1">Destination Country</label>
-                  <select
-                    value={routeForm.destinationCountry}
-                    onChange={(e) => setRouteForm({ ...routeForm, destinationCountry: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
-                  >
-                    <option value="Uganda">Uganda</option>
-                    <option value="Kenya">Kenya</option>
-                    <option value="Tanzania">Tanzania</option>
-                    <option value="Rwanda">Rwanda</option>
-                    <option value="DR Congo">DR Congo</option>
-                  </select>
+                  <label className="block text-slate-300 mb-1">Destination Country *</label>
+                  <input type="text" required maxLength={80} value={routeForm.destinationCountry} onChange={(e) => setRouteForm({ ...routeForm, destinationCountry: e.target.value })} className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white" />
                 </div>
                 <div>
                   <label className="block text-slate-300 mb-1">Destination City *</label>
@@ -726,6 +713,7 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
                   <label className="block text-slate-300 mb-1">Distance (KM) *</label>
                   <input
                     type="number"
+                    min="1"
                     required
                     value={routeForm.distanceKm}
                     onChange={(e) => setRouteForm({ ...routeForm, distanceKm: Number(e.target.value) })}
@@ -736,6 +724,8 @@ export const OperationsRoutes: React.FC<OperationsRoutesProps> = ({
                   <label className="block text-slate-300 mb-1">Estimated Days</label>
                   <input
                     type="number"
+                    min="1"
+                    required
                     value={routeForm.estimatedTransitDays}
                     onChange={(e) => setRouteForm({ ...routeForm, estimatedTransitDays: Number(e.target.value) })}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"
