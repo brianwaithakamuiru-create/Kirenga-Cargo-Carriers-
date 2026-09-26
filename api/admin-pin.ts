@@ -21,7 +21,9 @@ function getAdminApp() {
   return getApps()[0] || initializeApp({ credential: cert(credential), projectId: credential.project_id });
 }
 
-function getHeader(request: Request, name: string) { const value = request.headers?.[name] ?? request.headers?.[name.toLowerCase()]; return Array.isArray(value) ? value[0] : value; }\n\nfunction safeEqual(a: string, b: string) {
+function getHeader(request: Request, name: string) { const value = request.headers?.[name] ?? request.headers?.[name.toLowerCase()]; return Array.isArray(value) ? value[0] : value; }
+
+function safeEqual(a: string, b: string) {
   return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 }
 
@@ -67,8 +69,6 @@ export default async function handler(request: Request, response: Response) {
     if (!allowed) return response.status(429).json({ error: 'Too many PIN attempts. Try again in 15 minutes.' });
 
     const adminAuth = getAuth(app);
-    const adminAuth = getAuth(app);
-    const firestore = getFirestore(app);
     let adminUser;
     try {
       adminUser = await adminAuth.getUserByEmail('kirengacargo@gmail.com');
