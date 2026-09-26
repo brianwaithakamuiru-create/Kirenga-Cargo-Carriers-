@@ -75,7 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : null
+            ) : null}
           </div>
         </div>
       </div>
