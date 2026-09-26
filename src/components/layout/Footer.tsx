@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, MapPin, Phone, Mail, MessageSquare, ArrowRight, Lock } from 'lucide-react';
+import { ShieldCheck, MapPin, Phone, Mail, MessageSquare, ArrowRight } from 'lucide-react';
 import { CompanyLogo } from '../common/CompanyLogo';
 import { useBranding } from '../../context/BrandingContext';
 
@@ -147,15 +147,6 @@ export const Footer: React.FC<FooterProps> = ({ onNavigate }) => {
               <li className="flex items-center gap-2.5">
                 <Mail className="w-4 h-4 text-cyan-400 shrink-0" />
                 <span className="truncate">{branding.supportEmail || 'operations@kirengacargo.com'}</span>
-              </li>
-              <li className="pt-2">
-                <button
-                  onClick={() => onNavigate('login')}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-slate-300 hover:text-white text-xs font-mono transition-colors"
-                >
-                  <Lock className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Workplace Portal</span>
-                </button>
               </li>
             </ul>
           </div>
