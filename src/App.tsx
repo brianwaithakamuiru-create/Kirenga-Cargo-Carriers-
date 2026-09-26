@@ -13,6 +13,7 @@ const TrackingBox = lazy(() => import('./components/public/TrackingBox').then((m
 const BookingForm = lazy(() => import('./components/public/BookingForm').then((m) => ({ default: m.BookingForm })));
 const QuoteForm = lazy(() => import('./components/public/QuoteForm').then((m) => ({ default: m.QuoteForm })));
 const ServicesSection = lazy(() => import('./components/public/ServicesSection').then((m) => ({ default: m.ServicesSection })));
+const WhyChooseSection = lazy(() => import('./components/public/WhyChooseSection').then((m) => ({ default: m.WhyChooseSection })));
 const DestinationsSection = lazy(() => import('./components/public/DestinationsSection').then((m) => ({ default: m.DestinationsSection })));
 const FleetSection = lazy(() => import('./components/public/FleetSection').then((m) => ({ default: m.FleetSection })));
 const AboutSection = lazy(() => import('./components/public/AboutSection').then((m) => ({ default: m.AboutSection })));
