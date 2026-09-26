@@ -28,21 +28,35 @@ service cloud.firestore {
         : 'guest';
     }
 
-    function isAdmin() {
-      return (isSignedIn() && (
+    function isAdminBootstrapEmail() {
+      return isSignedIn() && (
         request.auth.token.email == 'kirengacargocariers@gmail.com' ||
         request.auth.token.email == 'kirengacarogocariers@gmail.com' ||
-        request.auth.token.email == 'brianwaithakamuiru@gmail.com' ||
-        getUserRole() == 'admin' || getUserRole() == 'ADMIN'
-      ));
+        request.auth.token.email == 'brianwaithakamuiru@gmail.com'
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        // The bootstrap emails may create their first admin profile.
+        isAdminBootstrapEmail() && !userDocExists()
+        ||
+        // Once a profile exists, the Firestore role AND active status are authoritative.
+        (userDocExists() &&
+          (getUserRole() == 'admin' || getUserRole() == 'ADMIN') &&
+          (getUserDoc().status == 'active' || getUserDoc().status == 'ACTIVE'))
+      );
     }
 
     function isWorker() {
-      return getUserRole() == 'worker' || getUserRole() == 'WORKER' || getUserRole() == 'staff' || getUserRole() == 'STAFF' || isAdmin();
+      return isSignedIn() && isActive() &&
+        (getUserRole() == 'worker' || getUserRole() == 'WORKER' ||
+         getUserRole() == 'staff' || getUserRole() == 'STAFF' || isAdmin());
     }
 
     function isDriver() {
-      return getUserRole() == 'driver' || getUserRole() == 'DRIVER' || isAdmin();
+      return isSignedIn() && isActive() &&
+        (getUserRole() == 'driver' || getUserRole() == 'DRIVER' || isAdmin());
     }
 
     function isActive() {
@@ -68,9 +82,15 @@ service cloud.firestore {
       allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
       
       // Creation: Only Admin, or the initial bootstrap admin account
-      allow create: if (isAdmin() && hasValidTimestamps())
+      allow create: if (isAdmin() && hasValidTimestamps()
+            && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN'
+                || request.resource.data.role == 'staff' || request.resource.data.role == 'STAFF'
+                || request.resource.data.role == 'worker' || request.resource.data.role == 'WORKER'
+                || request.resource.data.role == 'driver' || request.resource.data.role == 'DRIVER'))
         || (isSignedIn()
             && request.auth.uid == userId
+            && isAdminBootstrapEmail()
+            && !userDocExists()
             && (request.resource.data.email == 'kirengacargocariers@gmail.com' || request.resource.data.email == 'kirengacarogocariers@gmail.com' || request.resource.data.email == 'brianwaithakamuiru@gmail.com')
             && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN')
             && (request.resource.data.status == 'active' || request.resource.data.status == 'ACTIVE')
@@ -256,6 +276,16 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------
+    // ACTIVITY LOG (Operational audit trail)
+    // ----------------------------------------------------
+
+    match /activityLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && isActive();
+      allow update, delete: if false;
+    }
+
+    // ----------------------------------------------------
     // AUDIT LOG (Admin only view, append-only by system)
     // ----------------------------------------------------
     
@@ -263,6 +293,15 @@ service cloud.firestore {
       allow read: if isAdmin();
       allow create: if isSignedIn() && hasValidTimestamps();
       allow update, delete: if false; // Immutable audit log
+    }
+
+    // ----------------------------------------------------
+    // PUBLIC CONTACT REQUESTS
+    // ----------------------------------------------------
+
+    match /contactMessages/{messageId} {
+      allow create: if true;
+      allow read, update, delete: if isAdmin();
     }
 
     // ----------------------------------------------------
