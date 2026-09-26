@@ -99,7 +99,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const userEmail = (user.email || '').toLowerCase();
         const isAdminEmail =
           userEmail === 'kirengacargooc@gmail.com' ||
-          userEmail === 'kirengacargoc@gmail.com' ||
+          userEmail === 'kirengacargo@gmail.com' ||
           userEmail === 'kirengacargocariers@gmail.com' ||
           userEmail === 'kirengacarogocariers@gmail.com' ||
           userEmail === 'brianwaithakamuiru@gmail.com';
