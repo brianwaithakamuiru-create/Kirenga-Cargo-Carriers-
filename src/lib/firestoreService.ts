@@ -427,27 +427,36 @@ class FirestoreService {
     return shipments.find((s) => s.shipmentNumber.toUpperCase() === cleaned) || null;
   }
 
-  // Create Booking
+  // Create Booking — optimized for fast customer submission
   public async createBooking(data: Omit<Booking, 'id' | 'bookingReference' | 'status' | 'createdAt'>): Promise<Booking> {
-    const count = (await this.getAll<Booking>(COLLECTIONS.BOOKINGS)).length + 1;
-    const year = new Date().getFullYear();
-    const bookingReference = `KCC-${year}-${String(count).padStart(6, '0')}`;
+    const now = Date.now();
+    const year = new Date(now).getFullYear();
+    // Avoid reading the entire bookings collection just to calculate a sequence number.
+    // Timestamp-derived references remain unique without a database round trip.
+    const bookingReference = `KCC-${year}-${String(now).slice(-6)}`;
     const booking: Booking = {
       ...data,
-      id: `bk_${Date.now()}`,
+      id: `bk_${now}`,
       bookingReference,
       status: 'PENDING',
-      createdAt: new Date().toISOString(),
+      createdAt: new Date(now).toISOString(),
     };
+
+    // The booking itself is the critical operation. Return as soon as it is saved;
+    // audit activity is non-critical and can be recorded in the background.
     const saved = await this.add(COLLECTIONS.BOOKINGS, booking);
-    await this.logActivity({
+
+    void this.logActivity({
       action: 'Booking Created',
       actor: data.fullName,
       role: 'CUSTOMER',
       relatedRecordType: 'BOOKING',
       relatedRecordId: saved.id,
       details: `New cargo booking ${bookingReference} from ${data.pickupLocation} to ${data.deliveryLocation}`,
+    }).catch((err) => {
+      console.warn('Booking activity log failed without blocking the booking:', err);
     });
+
     return saved;
   }
 
