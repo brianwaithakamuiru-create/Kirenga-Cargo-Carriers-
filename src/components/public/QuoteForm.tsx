@@ -41,9 +41,8 @@ export const QuoteForm: React.FC<QuoteFormProps> = ({ onSuccess }) => {
 
     setLoading(true);
     try {
-      const quotes = await db.getAll<Quote>(COLLECTIONS.QUOTES);
       const year = new Date().getFullYear();
-      const quoteReference = `KCC-QT-${year}-${String(quotes.length + 1).padStart(4, '0')}`;
+      const quoteReference = `KCC-QT-${year}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 
       // Calculate an initial estimated transport rate based on weight and corridor
       const baseRate = formData.currency === 'USD' ? 2400 : 310000;
