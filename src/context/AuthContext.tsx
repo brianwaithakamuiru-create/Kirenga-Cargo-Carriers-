@@ -41,6 +41,7 @@ interface AuthContextType {
   sendPasswordReset: (emailOrUsername: string) => Promise<void>;
   changePassword: (newPass: string, currentPass?: string) => Promise<void>;
   changeTemporaryPassword: (currentPass: string, newPass: string) => Promise<void>;
+  setInitialPassword: (newPass: string) => Promise<void>;
   updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
   unlockSession: (pass: string) => Promise<boolean>;
   lockSession: () => void;
@@ -636,6 +637,31 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  // Set the administrator's password after passwordless identity sign-in.
+  // This is intentionally allowed without a current password because the user
+  // has just completed Firebase provider authentication (for example Google).
+  const setInitialPassword = async (newPass: string) => {
+    if (!auth.currentUser) {
+      throw new Error('No administrator is currently authenticated.');
+    }
+    if (newPass.length < 8) {
+      throw new Error('Administrator password must be at least 8 characters long.');
+    }
+    await firebaseUpdatePassword(auth.currentUser, newPass);
+    await db.updateUserProfile(auth.currentUser.uid, {
+      mustChangePassword: false,
+      updatedAt: new Date().toISOString(),
+    });
+    await refreshProfile();
+    await db.logAudit({
+      actorUid: auth.currentUser.uid,
+      actorRole: userProfile?.role || 'ADMIN',
+      action: 'PASSWORD_INITIALIZED',
+      targetUid: auth.currentUser.uid,
+      details: 'Administrator created a personal password after passwordless identity sign-in.',
+    }).catch(() => {});
+  };
+
   // Update Profile
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!currentUser) throw new Error('User is not authenticated.');
@@ -722,6 +748,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         sendPasswordReset,
         changePassword,
         changeTemporaryPassword,
+        setInitialPassword,
         updateProfile,
         unlockSession,
         lockSession,
