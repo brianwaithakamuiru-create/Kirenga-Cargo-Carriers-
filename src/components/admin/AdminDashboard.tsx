@@ -267,61 +267,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   }, []);
 
   // Convert Customer Booking to Official Shipment
-  const handleConvertBooking = async (booking: Booking) => {
+  const handleConvertBooking = async (booking: Booking, assignImmediately = false) => {
     try {
-      const year = new Date().getFullYear();
-      const count = shipments.length + 1;
-      const shipmentNumber = `KCC-${year}-${String(count).padStart(6, '0')}`;
+      const newShipment = await db.confirmBookingToShipment(
+        booking.id,
+        userProfile?.fullName || 'Administrator'
+      );
+      setShipments((current) =>
+        current.some((shipment) => shipment.id === newShipment.id) ? current : [...current, newShipment]
+      );
+      if (assignImmediately) {
+        setSelectedShipmentId(newShipment.id);
+        setShowDispatchModal(true);
+      }
 
-      const newShipment: Shipment = {
-        id: `sh_${Date.now()}`,
-        shipmentNumber,
-        bookingId: booking.id,
-        bookingReference: booking.bookingReference,
-        customerName: booking.fullName,
-        customerPhone: booking.phone,
-        customerEmail: booking.email,
-        originCountry: booking.pickupCountry,
-        originCity: booking.pickupLocation,
-        destinationCountry: booking.deliveryCountry,
-        destinationCity: booking.deliveryLocation,
-        cargoType: booking.cargoType,
-        cargoDescription: booking.cargoDescription,
-        weightKg: booking.weightKg,
-        quantity: booking.quantity,
-        status: 'BOOKED',
-        pickupDate: booking.pickupDate,
-        timeline: [
-          {
-            stage: 'Booking Approved',
-            timestamp: new Date().toISOString(),
-            completed: true,
-            notes: `Converted from Booking Ref ${booking.bookingReference}`,
-          },
-        ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      await db.add(COLLECTIONS.SHIPMENTS, newShipment);
-      await db.update<Booking>(COLLECTIONS.BOOKINGS, booking.id, {
-        status: 'CONFIRMED',
-        shipmentNumber,
-      });
-
-      await db.logActivity({
-        action: 'Booking Converted to Shipment',
-        actor: userProfile?.fullName || 'Admin',
-        role: 'ADMIN',
-        relatedRecordType: 'SHIPMENT',
-        relatedRecordId: newShipment.id,
-        details: `Booking ${booking.bookingReference} converted to Shipment ${shipmentNumber}`,
-      });
-
-      triggerToast(`Booking converted into Shipment ${shipmentNumber}`);
+      triggerToast(assignImmediately
+        ? 'Booking confirmed. Select an available driver and vehicle to dispatch it.'
+        : 'Booking confirmed and converted into Shipment ' + newShipment.shipmentNumber);
       loadAllData();
     } catch (err: any) {
-      triggerToast(`Error: ${err.message}`);
+      triggerToast(`Could not confirm booking: ${err.message || 'Please try again.'}`);
     }
   };
 
@@ -1184,13 +1149,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                           </div>
                         </div>
 
-                        <button
-                          onClick={() => handleConvertBooking(b)}
-                          className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/30 flex items-center gap-1.5 self-start sm:self-auto shrink-0"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
-                          <span>Approve & Create</span>
-                        </button>
+                        <div className="flex flex-wrap gap-2 self-start sm:self-auto shrink-0">
+                          <button
+                            onClick={() => handleConvertBooking(b)}
+                            className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs border border-slate-700"
+                          >
+                            <CheckCircle2 className="mr-1 inline h-3.5 w-3.5" />
+                            Create shipment
+                          </button>
+                          <button
+                            onClick={() => handleConvertBooking(b, true)}
+                            className="px-3.5 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs shadow-md shadow-cyan-600/30"
+                          >
+                            <Truck className="mr-1 inline h-3.5 w-3.5" />
+                            Create & assign
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1621,11 +1595,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Shipment --</option>
-                  {shipments.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.shipmentNumber} ({s.customerName} - {s.cargoType})
-                    </option>
-                  ))}
+                  {shipments
+                    .filter((shipment) =>
+                      !shipment.assignedDriverId &&
+                      shipment.status !== 'DELIVERED' &&
+                      shipment.status !== 'CANCELLED'
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.shipmentNumber} ({s.customerName} - {s.cargoType})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -1638,9 +1618,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Driver --</option>
-                  {drivers.map((d) => (
+                  {drivers.filter((driver) => driver.status === 'AVAILABLE').map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.fullName} ({d.phone}) - {d.status}
+                      {d.fullName} ({d.phone})
                     </option>
                   ))}
                 </select>
@@ -1655,9 +1635,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   className="w-full px-3 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-white"
                 >
                   <option value="">-- Choose Fleet Vehicle --</option>
-                  {vehicles.map((v) => (
+                  {vehicles.filter((vehicle) => vehicle.status === 'AVAILABLE').map((v) => (
                     <option key={v.id} value={v.id}>
-                      {v.registrationNumber} ({v.make} {v.model}) - {v.status}
+                      {v.registrationNumber} ({v.make} {v.model})
                     </option>
                   ))}
                 </select>
@@ -1694,7 +1674,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl"
+                  disabled={!drivers.some((driver) => driver.status === 'AVAILABLE') ||
+                    !vehicles.some((vehicle) => vehicle.status === 'AVAILABLE')}
+                  className="px-5 py-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-semibold rounded-xl disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Confirm Dispatch
                 </button>
