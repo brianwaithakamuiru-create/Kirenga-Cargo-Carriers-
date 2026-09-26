@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Truck, Calendar, MapPin, Package, FileUp, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import { Truck, Calendar, MapPin, Package, FileUp, CheckCircle, AlertCircle, ArrowRight, Printer } from 'lucide-react';
 import { db } from '../../lib/firestoreService';
 import { Booking } from '../../types';
 import { CompanyLogo } from '../common/CompanyLogo';
@@ -118,40 +118,53 @@ export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate 
 
   if (createdBooking) {
     return (
-      <div className="max-w-2xl mx-auto bg-[#0A1024]/95 border border-cyan-500/40 rounded-3xl p-8 sm:p-10 text-center shadow-2xl animate-fadeIn text-[#F8FAFC]">
+      <div id="booking-receipt" className="max-w-2xl mx-auto bg-[#0A1024]/95 border border-cyan-500/40 rounded-3xl p-8 sm:p-10 text-center shadow-2xl animate-fadeIn text-[#F8FAFC]">
+        <style>{`@media print { body * { visibility: hidden !important; } #booking-receipt, #booking-receipt * { visibility: visible !important; } #booking-receipt { position: absolute; inset: 0; width: 100%; max-width: none; color: #111 !important; background: #fff !important; border: 0 !important; box-shadow: none !important; } #booking-receipt .no-print { display: none !important; } }`}</style>
         <div className="w-16 h-16 rounded-2xl bg-cyan-950/80 border border-cyan-500/40 flex items-center justify-center text-cyan-400 mx-auto mb-4 shadow-lg shadow-cyan-950/50">
           <CheckCircle className="w-8 h-8 text-cyan-400" />
         </div>
         <span className="text-xs uppercase tracking-widest text-cyan-400 font-mono font-bold">
-          Booking Confirmed & Received
+          Booking Request Received
         </span>
         <h3 className="text-2xl sm:text-3xl font-black text-white font-['Montserrat'] mt-1 mb-2">
-          Cargo Consignment Generated
+          Your booking receipt
         </h3>
         <p className="text-slate-300 text-xs sm:text-sm max-w-md mx-auto mb-6 font-light">
-          Your booking request has been logged into {companyName || 'KIRENGA Central Command'}. Our dispatch controllers are verifying corridor clearance and assigning a vehicle.
+          Your booking is recorded with {companyName || 'KIRENGA CARGO CARRIERS'}. Keep this receipt and use its reference with your booking phone number to check progress. A team member will confirm dispatch details.
         </p>
 
         <div className="bg-[#050816] p-6 rounded-2xl border border-slate-800 text-left mb-6 space-y-3">
           <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-            <span className="text-xs text-slate-400">Booking Reference</span>
+            <span className="text-xs text-slate-400">Tracking / Booking Reference</span>
             <span className="font-mono text-base font-black text-cyan-400">{createdBooking.bookingReference}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400">Booked By</span>
+            <span className="text-white font-medium">{createdBooking.fullName} · {createdBooking.phone}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Corridor Route</span>
-            <span className="text-white font-medium">{createdBooking.pickupCountry} → {createdBooking.deliveryCountry}</span>
+            <span className="text-white font-medium text-right">{createdBooking.pickupLocation}, {createdBooking.pickupCountry} → {createdBooking.deliveryLocation}, {createdBooking.deliveryCountry}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-slate-400">Cargo Particulars</span>
             <span className="text-white font-medium">{createdBooking.cargoType} ({createdBooking.weightKg.toLocaleString()} kg)</span>
           </div>
           <div className="flex justify-between items-center text-xs">
-            <span className="text-slate-400">Operational Status</span>
-            <span className="px-2.5 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold font-mono">PENDING DISPATCH CLEARANCE</span>
+            <span className="text-slate-400">Cargo Description</span>
+            <span className="text-white font-medium text-right">{createdBooking.cargoDescription}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400">Quantity / Loading Date</span>
+            <span className="text-white font-medium">{createdBooking.quantity} · {createdBooking.pickupDate}</span>
+          </div>
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-slate-400">Booking Status</span>
+            <span className="px-2.5 py-0.5 rounded-full bg-cyan-950 border border-cyan-500/40 text-cyan-300 text-[11px] font-bold font-mono">RECEIVED · AWAITING REVIEW</span>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+        <div className="no-print flex flex-col sm:flex-row gap-3 justify-center">
           {onNavigate && (
             <button
               onClick={() => onNavigate('track')}
@@ -161,6 +174,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate 
               <ArrowRight className="w-4 h-4" />
             </button>
           )}
+          <button type="button" onClick={() => window.print()} className="px-6 py-3 rounded-xl border border-cyan-500/40 text-cyan-200 hover:bg-cyan-950/50 text-sm font-semibold flex items-center justify-center gap-2"><Printer className="w-4 h-4" /> Print / Save receipt</button>
           <button
             onClick={() => {
               setCreatedBooking(null);

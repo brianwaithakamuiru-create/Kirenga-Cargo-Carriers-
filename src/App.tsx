@@ -19,7 +19,6 @@ import { ContactSection } from './components/public/ContactSection';
 import { WhyChooseSection } from './components/public/WhyChooseSection';
 import { HowItWorksSection } from './components/public/HowItWorksSection';
 import { TestimonialsSection } from './components/public/TestimonialsSection';
-import { CustomerPortal } from './components/customer/CustomerPortal';
 import { DriverPortal } from './components/driver/DriverPortal';
 import { WorkerPortal } from './components/worker/WorkerPortal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
@@ -48,7 +47,6 @@ const AppContent: React.FC = () => {
           'driver',
           'staff',
           'worker',
-          'customer',
           'book',
           'quote',
           'track',
@@ -143,7 +141,6 @@ const AppContent: React.FC = () => {
               if (role === 'admin') navigateTo('admin');
               else if (role === 'driver') navigateTo('driver');
               else if (role === 'staff' || role === 'worker') navigateTo('staff');
-              else if (role === 'customer') navigateTo('customer');
               else navigateTo('home');
             }}
             className="w-full py-2.5 px-4 bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-xl text-xs font-bold shadow-lg flex items-center justify-center gap-2"
@@ -187,7 +184,6 @@ const AppContent: React.FC = () => {
               const r = (userProfile?.role || '').toLowerCase();
               if (r === 'admin') navigateTo('admin');
               else if (r === 'driver') navigateTo('driver');
-              else if (r === 'customer') navigateTo('customer');
               else navigateTo('staff');
             }}
             onSignOut={() => navigateTo('login')}
@@ -204,7 +200,6 @@ const AppContent: React.FC = () => {
                   const r = (userProfile?.role || '').toLowerCase();
                   if (r === 'admin') navigateTo('admin');
                   else if (r === 'driver') navigateTo('driver');
-                  else if (r === 'customer') navigateTo('customer');
                   else navigateTo('staff');
                 }}
                 onSignOut={() => navigateTo('login')}
@@ -377,18 +372,6 @@ const AppContent: React.FC = () => {
               </div>
             )}
 
-            {/* VIEW: Customer Portal */}
-            {currentView === 'customer' && (
-              !currentUser ? (
-                <SharedLoginPortal onNavigate={navigateTo} />
-              ) : isAccountUnavailable ? (
-                renderUnavailableScreen()
-              ) : role !== 'customer' && role !== 'admin' ? (
-                renderRoleMismatch('customer')
-              ) : (
-                <CustomerPortal onNavigate={navigateTo} />
-              )
-            )}
           </>
         )}
       </main>

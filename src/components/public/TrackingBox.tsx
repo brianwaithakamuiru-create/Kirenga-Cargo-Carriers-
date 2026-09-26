@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Search, AlertCircle, Clock, MapPin, Truck, User, CheckCircle2, Shield, Calendar, Package, ArrowRight, RefreshCw, Compass } from 'lucide-react';
-import { db, COLLECTIONS } from '../../lib/firestoreService';
 import { PublicShipmentTracking } from '../../types';
 import { CargoTrackingAnimation } from '../common/CargoTrackingAnimation';
 import { StatusBadge } from '../common/StatusBadge';
@@ -16,16 +15,17 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
   isCompact = false,
 }) => {
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber);
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [shipment, setShipment] = useState<PublicShipmentTracking | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
 
-  const handleTrack = async (customCode?: string) => {
-    const code = (customCode || trackingNumber).trim();
-    if (!code) {
-      setError('Please enter a valid consignment reference or waybill number.');
+  const handleTrack = async () => {
+    const code = trackingNumber.trim();
+    if (!code || !phoneNumber.trim()) {
+      setError('Enter the tracking reference and the phone number used for the booking.');
       return;
     }
 
@@ -34,16 +34,18 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
     setHasSearched(true);
 
     try {
-      const found = await db.getShipmentByNumber(code);
-      if (found) {
-        setShipment(found);
-      } else {
-        setShipment(null);
-        setError(`No consignment record found for "${code}". Please verify the waybill number.`);
-      }
+      const response = await fetch('/api/track', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trackingNumber: code, phoneNumber: phoneNumber.trim() }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Tracking could not be verified.');
+      setShipment(result.shipment as PublicShipmentTracking);
     } catch (err: any) {
       console.error('Tracking query error:', err);
-      setError('An error occurred while connecting to the telemetry server. Please try again.');
+      setShipment(null);
+      setError(err?.message || 'Tracking could not be verified. Check the reference and booking phone number.');
     } finally {
       setLoading(false);
     }
@@ -52,18 +54,8 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
   useEffect(() => {
     if (initialTrackingNumber) {
       setTrackingNumber(initialTrackingNumber);
-      handleTrack(initialTrackingNumber);
     }
   }, [initialTrackingNumber]);
-
-  // Subscribe to real-time updates for active shipment
-  useEffect(() => {
-    if (!shipment) return;
-    const unsubscribe = db.subscribeShipmentTracking(shipment.shipmentNumber, (refreshed) => {
-      setShipment(refreshed);
-    });
-    return () => unsubscribe();
-  }, [shipment?.shipmentNumber]);
 
   return (
     <div className={`w-full ${isCompact ? '' : 'max-w-5xl mx-auto'} space-y-6 text-[#F8FAFC]`}>
@@ -77,7 +69,7 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
             Consignment Tracking Telemetry
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-1 font-light font-['Poppins']">
-            Real-time status updates and electronic corridor milestone verification across East Africa.
+            Enter the tracking reference from your receipt and the phone number used for that booking. No customer account is required.
           </p>
         </div>
 
@@ -99,10 +91,11 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
                 setTrackingNumber(e.target.value);
                 if (error) setError(null);
               }}
-              placeholder="Enter Consignment or Tracking Ref (e.g. KCC-2026-000001)"
+              placeholder="Booking / tracking reference (e.g. KCC-2026-123456)"
               className="w-full pl-12 pr-4 py-4 bg-slate-950 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm sm:text-base font-mono focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-colors uppercase shadow-inner"
             />
           </div>
+          <input type="tel" required value={phoneNumber} onChange={(e) => { setPhoneNumber(e.target.value); if (error) setError(null); }} placeholder="Booking phone number" autoComplete="tel" className="flex-1 px-4 py-4 bg-slate-950 border border-slate-700/80 rounded-xl text-white placeholder-slate-500 text-sm focus:outline-none focus:border-cyan-400" />
           <button
             type="submit"
             disabled={loading}
