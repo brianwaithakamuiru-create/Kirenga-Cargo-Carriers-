@@ -170,29 +170,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   const [composePriority, setComposePriority] = useState<'NORMAL' | 'HIGH' | 'URGENT'>('NORMAL');
   const [sendingNotification, setSendingNotification] = useState(false);
 
+  // Load the data needed for the dashboard first. Secondary collections load
+  // afterward so the interface becomes usable without waiting for every module.
   const loadAllData = async () => {
     try {
-      const [
-        bList,
-        sList,
-        tList,
-        dList,
-        vList,
-        qList,
-        iList,
-        eList,
-        viList,
-        tckList,
-        cmList,
-        logList,
-        cList,
-        docList,
-      ] = await Promise.all([
+      const [bList, sList, tList, dList, vList] = await Promise.all([
         db.getAll<Booking>(COLLECTIONS.BOOKINGS),
         db.getAll<Shipment>(COLLECTIONS.SHIPMENTS),
         db.getAll<Trip>(COLLECTIONS.TRIPS),
         db.getAll<Driver>(COLLECTIONS.DRIVERS),
         db.getAll<Vehicle>(COLLECTIONS.VEHICLES),
+      ]);
+
+      setBookings(bList);
+      setShipments(sList);
+      setTrips(tList);
+      setDrivers(dList);
+      setVehicles(vList);
+      setLoading(false);
+
+      // Do not block the dashboard on finance, documents, support and reporting data.
+      void Promise.all([
         db.getAll<Quote>(COLLECTIONS.QUOTES),
         db.getAll<Invoice>(COLLECTIONS.INVOICES),
         db.getAll<DriverExpense>(COLLECTIONS.DRIVER_EXPENSES),
@@ -202,38 +200,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         db.getAll<ActivityLog>(COLLECTIONS.ACTIVITY_LOGS),
         db.getAll<Client>(COLLECTIONS.CLIENTS),
         db.getAll<LogisticsDocument>(COLLECTIONS.DOCUMENTS),
-      ]);
-      setBookings(bList);
-      setShipments(sList);
-      setTrips(tList);
-      setDrivers(dList);
-      setVehicles(vList);
-      setQuotes(qList);
-      setInvoices(iList);
-      setExpenses(eList);
-      setVehicleIssues(viList);
-      setTickets(tckList);
-      setContactMessages(cmList);
-      setActivityLogs(logList);
-      setClients(cList);
-      setDocuments(docList);
+      ]).then(([qList, iList, eList, viList, tckList, cmList, logList, cList, docList]) => {
+        setQuotes(qList);
+        setInvoices(iList);
+        setExpenses(eList);
+        setVehicleIssues(viList);
+        setTickets(tckList);
+        setContactMessages(cmList);
+        setActivityLogs(logList);
+        setClients(cList);
+        setDocuments(docList);
+      }).catch((e) => {
+        console.error('Error loading secondary admin data:', e);
+      });
     } catch (e) {
-      console.error('Error loading admin operational data:', e);
-    } finally {
+      console.error('Error loading critical admin data:', e);
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadAllData();
-    const unsub = db.subscribe('*', loadAllData);
-    return () => unsub();
+    void loadAllData();
+    // A wildcard Firestore subscription caused unnecessary full refreshes and
+    // attempted to subscribe to a non-existent "*" collection. Use the manual
+    // refresh action instead of repeatedly downloading every collection.
+    return undefined;
   }, []);
-
-  const triggerToast = (msg: string) => {
-    setNotificationMsg(msg);
-    setTimeout(() => setNotificationMsg(null), 4000);
-  };
 
   // Convert Customer Booking to Official Shipment
   const handleConvertBooking = async (booking: Booking) => {
