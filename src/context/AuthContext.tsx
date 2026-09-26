@@ -463,12 +463,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       throw new Error(err.message || 'Administrator identity sign-in failed.');
     }
 
-    const profile = await db.getUserProfile(authUser.uid);
+    let profile = await db.getUserProfile(authUser.uid);
     if (!authUser.emailVerified || !profile || profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
       await firebaseSignOut(auth);
       setCurrentUser(null);
       setUserProfile(null);
       throw new Error('This identity must be linked to an active administrator account before it can sign in.');
+    }
+
+    if (!authUser.providerData.some((item) => item.providerId === 'password') && !profile.mustChangePassword) {
+      profile = { ...profile, mustChangePassword: true };
+      await db.updateUserProfile(authUser.uid, { mustChangePassword: true, updatedAt: new Date().toISOString() });
     }
 
     profileCacheRef.current.set(authUser.uid, profile);
