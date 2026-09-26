@@ -42,7 +42,7 @@ const getInitialView = (): string => {
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>(getInitialView);
-  const { currentUser, userProfile, role, signOut, isSessionLocked, mustChangePassword } = useAuth();
+  const { currentUser, userProfile, role, signOut, isSessionLocked, mustChangePassword, adminPinVerified } = useAuth();
 
   // Handle URL hash and path routing (e.g. #/login, #/admin, #/driver, #/staff, #/change-password)
   useEffect(() => {
@@ -196,7 +196,7 @@ const AppContent: React.FC = () => {
             {/* VIEW: Admin Central Command & Sub-routes */}
             {isAdminView && (
               <>
-                {!currentUser ? (
+                {!currentUser || (role === 'admin' && !adminPinVerified) ? (
                   <SharedLoginPortal onNavigate={navigateTo} />
                 ) : isAccountUnavailable ? (
                   renderUnavailableScreen()
