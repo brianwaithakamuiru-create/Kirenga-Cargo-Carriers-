@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import {
   User,
   onAuthStateChanged,
@@ -59,9 +59,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Load system settings
   useEffect(() => {
-    db.getSystemSettings().then((s) => {
-      if (s) setSystemSettings(s);
-    });
+    void db.getSystemSettings()
+      .then((s) => {
+        if (s) setSystemSettings(s);
+      })
+      .catch((err) => {
+        console.warn('System settings could not be loaded; using safe defaults.', err);
+      });
   }, []);
 
   // Fetch Firestore profile for an authenticated user
@@ -94,16 +98,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      setUserProfile(null);
+      setIsSessionLocked(false);
       if (user) {
-        let profile = await loadProfile(user.uid);
-        const userEmail = (user.email || '').toLowerCase();
-        const isAdminEmail =
-          userEmail === 'kirengacargooc@gmail.com' ||
-          userEmail === 'kirengacargo@gmail.com' ||
-          userEmail === 'kirengacargocariers@gmail.com' ||
-          userEmail === 'kirengacarogocariers@gmail.com' ||
-          userEmail === 'brianwaithakamuiru@gmail.com';
-
+        const profile = await loadProfile(user.uid);
         // Admin provisioning/repair is handled during the explicit login flow.
         // Do not perform additional Firestore writes from the auth-state listener.
 
@@ -170,9 +168,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       persistenceRef.current = remember;
     }
 
-    let prospectiveUser: UserProfile | null = null;
     const normalizedEmail = emailToUse;
     const isAdminEmail =
+      normalizedEmail === 'kirengacargo@gmail.com' ||
       normalizedEmail === 'kirengacargoc@gmail.com' ||
       normalizedEmail === 'kirengacargocariers@gmail.com' ||
       normalizedEmail === 'kirengacarogocariers@gmail.com' ||
