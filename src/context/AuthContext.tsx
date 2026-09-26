@@ -189,8 +189,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Sign In implementation
   const signIn = async (emailOrUsername: string, pass: string, remember: boolean = true): Promise<UserProfile> => {
-    const input = emailOrUsername.trim();
-    let emailToUse = input;
+    const emailToUse = emailOrUsername.trim().toLowerCase();
+
+    // Firebase Authentication is the authoritative credential store.
+    // Do not perform unauthenticated username lookups against Firestore:
+    // Firestore rules intentionally keep workforce profiles private.
+    if (!emailToUse || !emailToUse.includes('@')) {
+      throw new Error('Please sign in with your registered email address.');
+    }
 
     // Configure Firebase persistence only when the user's preference changes.
     // Avoid repeating the IndexedDB/session setup on every login attempt.
@@ -200,42 +206,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     let prospectiveUser: UserProfile | null = null;
-
-    // If input does not contain '@', look up email by username in Firestore
-    if (!input.includes('@')) {
-      const lowerInput = input.toLowerCase();
-      if (
-        lowerInput === 'admin' ||
-        lowerInput === 'kirengacargo' ||
-        lowerInput === 'kirengacargoc' ||
-        lowerInput === 'kirengacargocariers' ||
-        lowerInput === 'kcc-admin' ||
-        lowerInput === 'central-admin'
-      ) {
-        emailToUse = 'kirengacargoc@gmail.com';
-      } else {
-        prospectiveUser = await db.getUserByUsername(input);
-        if (!prospectiveUser || !prospectiveUser.email) {
-          throw new Error(`No workforce account found for username "${input}". Please verify and try again.`);
-        }
-        emailToUse = prospectiveUser.email;
-      }
-    } else {
-      // Firebase Authentication validates the email directly. Avoid downloading
-      // the entire workforce collection just to perform a pre-auth status check.
-      // The authoritative Firestore profile is loaded immediately after auth succeeds.
-      prospectiveUser = null;
-    }
-
-    // Pre-auth status check if user profile exists
-    if (prospectiveUser) {
-      const st = (prospectiveUser.status || '').toLowerCase();
-      if (st === 'inactive' || st === 'suspended' || st === 'locked') {
-        throw new Error('Your account is currently unavailable. Contact the Kirenga Cargo Carriers administrator.');
-      }
-    }
-
-    const normalizedEmail = emailToUse.toLowerCase();
+    const normalizedEmail = emailToUse;
     const isAdminEmail =
       normalizedEmail === 'kirengacargoc@gmail.com' ||
       normalizedEmail === 'kirengacargocariers@gmail.com' ||
@@ -247,18 +218,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const cred = await signInWithEmailAndPassword(auth, emailToUse, pass);
       authUser = cred.user;
     } catch (authErr: any) {
-      // Failed-attempt tracking is only needed after an authentication failure.
-      // Keep the successful-login path free of a full users collection read.
-      if (!prospectiveUser && !isAdminEmail) {
-        try {
-          const allUsers = await db.getAllUsers();
-          prospectiveUser = allUsers.find(
-            u => u.email.toLowerCase() === emailToUse.toLowerCase()
-          ) || null;
-        } catch {
-          prospectiveUser = null;
-        }
-      }
+      // Do not query the private users collection before authentication succeeds.
+      // This prevents account enumeration and keeps the fast login path database-light.
 
       // Check for Initial Administrator account bootstrap
       if (isAdminEmail && (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential')) {
@@ -307,31 +268,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         }
       }
 
-      // Track failed login attempts for account lockout protection
-      if (
-        prospectiveUser &&
-        (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/invalid-credential')
-      ) {
-        const attempts = (prospectiveUser.failedLoginAttempts || 0) + 1;
-        if (attempts >= 5) {
-          await db.updateUserProfile(prospectiveUser.uid, {
-            status: 'LOCKED',
-            failedLoginAttempts: attempts,
-          });
-          await db.logAudit({
-            actorUid: prospectiveUser.uid,
-            actorRole: prospectiveUser.role || 'WORKER',
-            action: 'ACCOUNT_LOCKED',
-            targetUid: prospectiveUser.uid,
-            details: `Account automatically locked following ${attempts} failed login attempts.`,
-          });
-          throw new Error('Your account is currently unavailable. Contact the Kirenga Cargo Carriers administrator.');
-        } else {
-          await db.updateUserProfile(prospectiveUser.uid, {
-            failedLoginAttempts: attempts,
-          });
-        }
-      }
+      // Failed-attempt lockout is enforced by Firebase Authentication's
+      // anti-abuse protections. Account status is enforced after successful auth
+      // from the private Firestore profile, so no sensitive profile query is needed here.
 
       // Map Firebase error codes to human-readable messages
       if (authErr.code === 'auth/wrong-password' || authErr.code === 'auth/invalid-credential') {
@@ -447,14 +386,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Password Reset
   const sendPasswordReset = async (emailOrUsername: string) => {
-    const input = emailOrUsername.trim();
-    let emailToUse = input;
-    if (!input.includes('@')) {
-      const userDoc = await db.getUserByUsername(input);
-      if (!userDoc || !userDoc.email) {
-        throw new Error(`Username "${input}" not found.`);
-      }
-      emailToUse = userDoc.email;
+    const emailToUse = emailOrUsername.trim().toLowerCase();
+    if (!emailToUse || !emailToUse.includes('@')) {
+      throw new Error('Please enter your registered email address.');
     }
     await sendPasswordResetEmail(auth, emailToUse);
     if (currentUser) {
