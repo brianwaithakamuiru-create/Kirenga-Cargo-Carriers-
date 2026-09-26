@@ -828,6 +828,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         systemSettings,
         signIn,
         signInWithGoogle,
+        signInWithAdminPin,
         signInWithAdminProvider,
         linkGoogleAccount,
         linkAdminProvider,
