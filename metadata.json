@@ -1,0 +1,7 @@
+{
+  "name": "Kirenga Cargo Carriers",
+  "description": "Logistics and cargo management platform for East and Central Africa featuring a public website, tracking, customer portal, driver workplace, and admin command center.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+

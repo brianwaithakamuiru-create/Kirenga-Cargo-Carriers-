@@ -1,0 +1,317 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ----------------------------------------------------
+    // HELPER FUNCTIONS & AUTHENTICATION ABSTRACTION
+    // ----------------------------------------------------
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userDocExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserRole() {
+      return isSignedIn() && userDocExists()
+        ? getUserDoc().role
+        : 'guest';
+    }
+
+    function isAdmin() {
+      return (isSignedIn() && (
+        request.auth.token.email == 'kirengacargocariers@gmail.com' ||
+        request.auth.token.email == 'kirengacarogocariers@gmail.com' ||
+        request.auth.token.email == 'brianwaithakamuiru@gmail.com' ||
+        getUserRole() == 'admin' || getUserRole() == 'ADMIN'
+      ));
+    }
+
+    function isWorker() {
+      return getUserRole() == 'worker' || getUserRole() == 'WORKER' || getUserRole() == 'staff' || getUserRole() == 'STAFF' || isAdmin();
+    }
+
+    function isDriver() {
+      return getUserRole() == 'driver' || getUserRole() == 'DRIVER' || isAdmin();
+    }
+
+    function isActive() {
+      return isSignedIn() && userDocExists() && (getUserDoc().status == 'active' || getUserDoc().status == 'ACTIVE');
+    }
+
+    function hasValidTimestamps() {
+      return request.resource.data.createdAt is string
+          && request.resource.data.updatedAt is string;
+    }
+
+    // Default: Deny all by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ----------------------------------------------------
+    // USERS (Admin-created accounts + Initial Bootstrap)
+    // ----------------------------------------------------
+    
+    match /users/{userId} {
+      // Users can read own profile; Admin can read all
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      
+      // Creation: Only Admin, or the initial bootstrap admin account
+      allow create: if (isAdmin() && hasValidTimestamps())
+        || (isSignedIn()
+            && request.auth.uid == userId
+            && (request.resource.data.email == 'kirengacargocariers@gmail.com' || request.resource.data.email == 'kirengacarogocariers@gmail.com' || request.resource.data.email == 'brianwaithakamuiru@gmail.com')
+            && (request.resource.data.role == 'admin' || request.resource.data.role == 'ADMIN')
+            && (request.resource.data.status == 'active' || request.resource.data.status == 'ACTIVE')
+            && hasValidTimestamps());
+
+      // Update: Admin can update any field; User can update non-sensitive profile fields or complete password change
+      allow update: if (isAdmin() && hasValidTimestamps())
+        || (isOwner(userId)
+            && (isActive() || request.resource.data.mustChangePassword == false)
+            && request.resource.data.role == resource.data.role
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.department == resource.data.department
+            && request.resource.data.employeeId == resource.data.employeeId
+            && request.resource.data.createdBy == resource.data.createdBy
+            && hasValidTimestamps());
+
+      allow delete: if isAdmin();
+    }
+
+    // ----------------------------------------------------
+    // DEPARTMENTS (Configured by Admin)
+    // ----------------------------------------------------
+    
+    match /departments/{departmentId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // DRIVERS DIRECTORY
+    // ----------------------------------------------------
+    
+    match /drivers/{driverId} {
+      allow read: if isSignedIn() && (isAdmin() || isWorker() || (resource.data.userId == request.auth.uid));
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // FLEET VEHICLES & TRAILERS
+    // ----------------------------------------------------
+    
+    match /vehicles/{vehicleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /trailers/{trailerId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /maintenance/{maintenanceId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /fuelRecords/{fuelId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isDriver()) && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // CLIENTS & COMMERCIAL
+    // ----------------------------------------------------
+    
+    match /clients/{clientId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if hasValidTimestamps();
+      allow update, delete: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /quotes/{quoteId} {
+      allow read: if true;
+      allow create: if hasValidTimestamps();
+      allow update, delete: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /quotations/{quotationId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /expenses/{expenseId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker() || isDriver()) && hasValidTimestamps();
+    }
+
+    match /driverExpenses/{expenseId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker() || isDriver()) && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // WAREHOUSE, CHECKPOINTS, BORDER CROSSINGS
+    // ----------------------------------------------------
+
+    match /warehouse/{warehouseId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /checkpoints/{checkpointId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /borderCrossings/{borderId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /deliveryProofs/{proofId} {
+      allow read: if isSignedIn();
+      allow write: if (isAdmin() || isDriver() || isWorker()) && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // DISPATCHED TRIPS
+    // ----------------------------------------------------
+    
+    match /trips/{tripId} {
+      allow read: if isSignedIn() && (isAdmin() || isWorker() || (resource.data.driverId == request.auth.uid));
+      allow create, delete: if isAdmin() && hasValidTimestamps();
+      allow update: if (isAdmin() || isWorker() || (
+        isDriver() && resource.data.driverId == request.auth.uid
+      )) && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // CARGO & SHIPMENTS
+    // ----------------------------------------------------
+    
+    match /cargo/{cargoId} {
+      allow read: if true; // Public tracking
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    match /shipments/{shipmentId} {
+      allow read: if true; // Public tracking
+      allow write: if (isAdmin() || isWorker()) && hasValidTimestamps();
+    }
+
+    // ----------------------------------------------------
+    // DOCUMENTS
+    // ----------------------------------------------------
+    
+    match /documents/{documentId} {
+      allow read: if isSignedIn() && (
+        isAdmin() ||
+        isWorker() ||
+        resource.data.uploadedBy == request.auth.uid ||
+        resource.data.driverId == request.auth.uid
+      );
+      allow create: if isSignedIn() && isActive() && hasValidTimestamps();
+      allow update, delete: if isAdmin() || (
+        isSignedIn() && resource.data.uploadedBy == request.auth.uid
+      );
+    }
+
+    // ----------------------------------------------------
+    // NOTIFICATIONS
+    // ----------------------------------------------------
+    
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create, delete: if isAdmin() || isWorker();
+    }
+
+    // ----------------------------------------------------
+    // AUDIT LOG (Admin only view, append-only by system)
+    // ----------------------------------------------------
+    
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && hasValidTimestamps();
+      allow update, delete: if false; // Immutable audit log
+    }
+
+    // ----------------------------------------------------
+    // SYSTEM SETTINGS & BRANDING (Public read, Admin write)
+    // ----------------------------------------------------
+    
+    match /systemSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /companySettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /websiteSettings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /branding/{brandingId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /websiteContent/{contentId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /services/{serviceId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /countries/{countryId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    match /routes/{routeId} {
+      allow read: if true;
+      allow write: if isAdmin() && hasValidTimestamps();
+    }
+
+    // Connection validation test document
+    match /test/{testId} {
+      allow read: if true;
+    }
+  }
+}

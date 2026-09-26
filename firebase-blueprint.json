@@ -1,0 +1,333 @@
+{
+  "entities": {
+    "user": {
+      "title": "User Profile & Workforce Account",
+      "description": "Authenticated platform user with assigned role, department, and workplace permissions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "country": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "worker", "driver", "staff", "ADMIN", "WORKER", "DRIVER", "STAFF"] },
+        "status": { "type": "string", "enum": ["active", "inactive", "suspended", "locked", "ACTIVE", "INACTIVE", "SUSPENDED", "LOCKED"] },
+        "department": { "type": "string" },
+        "position": { "type": "string" },
+        "employeeId": { "type": "string" },
+        "jobTitle": { "type": "string" },
+        "assignedLocation": { "type": "string" },
+        "assignedVehicleId": { "type": "string" },
+        "assignedVehicleReg": { "type": "string" },
+        "assignedRoute": { "type": "string" },
+        "driverReferenceNumber": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "licenseExpiryDate": { "type": "string" },
+        "emergencyContact": { "type": "string" },
+        "employmentStatus": { "type": "string" },
+        "mustChangePassword": { "type": "boolean" },
+        "failedLoginAttempts": { "type": "number" },
+        "lastLoginAt": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "uid", "fullName", "username", "email", "role", "status", "createdAt", "updatedAt"]
+    },
+    "department": {
+      "title": "Workforce Department",
+      "description": "Organizational department configured by the Administrator.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "headOfDepartment": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "name", "createdAt", "updatedAt"]
+    },
+    "driver": {
+      "title": "Commercial Driver Record",
+      "description": "Commercial driver directory record linked to an authenticated user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "licenseNumber": { "type": "string" },
+        "experienceYears": { "type": "number" },
+        "assignedVehicleId": { "type": "string" },
+        "assignedVehicleReg": { "type": "string" },
+        "status": { "type": "string", "enum": ["AVAILABLE", "ON_TRIP", "OFF_DUTY"] },
+        "operatingCountries": { "type": "array" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "fullName", "phone", "email", "status", "createdAt", "updatedAt"]
+    },
+    "vehicle": {
+      "title": "Fleet Asset",
+      "description": "Fleet asset registry with payload capacity and driver assignment.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "registrationNumber": { "type": "string" },
+        "make": { "type": "string" },
+        "model": { "type": "string" },
+        "vehicleType": { "type": "string" },
+        "capacityKg": { "type": "number" },
+        "status": { "type": "string", "enum": ["AVAILABLE", "ASSIGNED", "MAINTENANCE"] },
+        "assignedDriverId": { "type": "string" },
+        "assignedDriverName": { "type": "string" },
+        "insuranceExpiry": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "registrationNumber", "make", "vehicleType", "capacityKg", "status", "createdAt", "updatedAt"]
+    },
+    "trip": {
+      "title": "Dispatched Trip",
+      "description": "Dispatched operational haulage journey executed by an assigned driver and vehicle.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tripReference": { "type": "string" },
+        "shipmentNumber": { "type": "string" },
+        "driverId": { "type": "string" },
+        "driverName": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "vehicleReg": { "type": "string" },
+        "cargoTitle": { "type": "string" },
+        "weightKg": { "type": "number" },
+        "originCountry": { "type": "string" },
+        "destinationCountry": { "type": "string" },
+        "pickupLocation": { "type": "string" },
+        "deliveryLocation": { "type": "string" },
+        "status": { "type": "string", "enum": ["ASSIGNED", "LOADING", "IN_TRANSIT", "AT_BORDER", "DELIVERED", "CANCELLED"] },
+        "scheduledPickupDate": { "type": "string" },
+        "estimatedDeliveryDate": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "tripReference", "driverId", "driverName", "pickupLocation", "deliveryLocation", "status", "createdAt", "updatedAt"]
+    },
+    "cargo": {
+      "title": "Cargo Consignment",
+      "description": "Commercial cargo and shipment consignments.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "shipmentNumber": { "type": "string" },
+        "trackingNumber": { "type": "string" },
+        "title": { "type": "string" },
+        "cargoType": { "type": "string" },
+        "weightKg": { "type": "number" },
+        "originCountry": { "type": "string" },
+        "destinationCountry": { "type": "string" },
+        "senderName": { "type": "string" },
+        "recipientName": { "type": "string" },
+        "assignedTripId": { "type": "string" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "shipmentNumber", "cargoType", "weightKg", "status", "createdAt", "updatedAt"]
+    },
+    "document": {
+      "title": "Logistics & Compliance Document",
+      "description": "Verified documents including driver licenses, vehicle permits, and consignment waybills.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["vehicle", "trip", "driver", "staff", "compliance"] },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileSize": { "type": "string" },
+        "uploadedBy": { "type": "string" },
+        "driverId": { "type": "string" },
+        "vehicleId": { "type": "string" },
+        "tripId": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "category", "fileName", "uploadedBy", "createdAt", "updatedAt"]
+    },
+    "notification": {
+      "title": "System Notification",
+      "description": "In-app notification dispatched to users.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "warning", "alert", "dispatch"] },
+        "read": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt", "updatedAt"]
+    },
+    "auditLog": {
+      "title": "Security & Action Audit Log",
+      "description": "Immutable operational and security audit log.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "actorUid": { "type": "string" },
+        "actorRole": { "type": "string" },
+        "action": { "type": "string" },
+        "targetUid": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "metadata": { "type": "object" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "targetUserId": { "type": "string" },
+        "details": { "type": "string" },
+        "ip": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "action", "createdAt"]
+    },
+    "systemSettings": {
+      "title": "System & Security Settings",
+      "description": "Global company profile, branding, and security parameters.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "wallpaperUrl": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" },
+        "sessionTimeoutSeconds": { "type": "number" },
+        "theme": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "companyName", "createdAt", "updatedAt"]
+    },
+    "websiteContent": {
+      "title": "Website Content",
+      "description": "Editable CMS section content for Kerenga Cargo Carriers live website pages.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sectionKey": { "type": "string" },
+        "title": { "type": "string" },
+        "subtitle": { "type": "string" },
+        "content": { "type": "object" },
+        "metaDescription": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "sectionKey", "title", "content", "createdAt", "updatedAt"]
+    },
+    "companySettings": {
+      "title": "Company Settings & Branding Configuration",
+      "description": "Stores company name, uploaded logo metadata, storage paths, and logo dimensions.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "companyName": { "type": "string" },
+        "tagline": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "logoStoragePath": { "type": "string" },
+        "logoVersion": { "type": "number" },
+        "faviconUrl": { "type": "string" },
+        "logoSize": { "type": "number" },
+        "logoPosition": { "type": "string" },
+        "darkLogoUrl": { "type": "string" },
+        "lightLogoUrl": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["id", "companyName", "updatedAt"]
+    },
+    "animationSettings": {
+      "title": "Animation Control Configuration",
+      "description": "Controls enabling, speed, and intensity of hero, truck, route, and scroll animations.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "heroAnimationEnabled": { "type": "boolean" },
+        "truckAnimationEnabled": { "type": "boolean" },
+        "routeAnimationEnabled": { "type": "boolean" },
+        "scrollAnimationsEnabled": { "type": "boolean" },
+        "animationSpeed": { "type": "string", "enum": ["slow", "normal", "fast"] },
+        "animationIntensity": { "type": "string", "enum": ["subtle", "moderate", "dynamic"] },
+        "reducedMotionFallback": { "type": "string", "enum": ["auto", "force_reduced", "force_animated"] },
+        "loadingAnimationEnabled": { "type": "boolean" },
+        "backgroundAnimationEnabled": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "heroAnimationEnabled", "truckAnimationEnabled", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Workforce user profiles with role-based access control (admin, worker, driver)."
+    },
+    "/departments/{departmentId}": {
+      "schema": "department",
+      "description": "Configurable company departments."
+    },
+    "/drivers/{driverId}": {
+      "schema": "driver",
+      "description": "Driver personnel records and status."
+    },
+    "/vehicles/{vehicleId}": {
+      "schema": "vehicle",
+      "description": "Fleet asset registry with driver allocations."
+    },
+    "/trips/{tripId}": {
+      "schema": "trip",
+      "description": "Dispatched transport journeys and delivery milestones."
+    },
+    "/cargo/{cargoId}": {
+      "schema": "cargo",
+      "description": "Commercial freight consignments."
+    },
+    "/documents/{documentId}": {
+      "schema": "document",
+      "description": "Vehicle, trip, driver, and staff documentation."
+    },
+    "/notifications/{notificationId}": {
+      "schema": "notification",
+      "description": "Dispatches, trip alerts, and system notifications."
+    },
+    "/auditLogs/{logId}": {
+      "schema": "auditLog",
+      "description": "Central audit trail of user, security, and administrative actions."
+    },
+    "/systemSettings/{settingId}": {
+      "schema": "systemSettings",
+      "description": "Branding, appearance, and session timeout policies."
+    },
+    "/companySettings/{settingId}": {
+      "schema": "companySettings",
+      "description": "Official company branding and logo storage configuration."
+    },
+    "/websiteSettings/{settingId}": {
+      "schema": "animationSettings",
+      "description": "Animation controls and performance preferences."
+    },
+    "/websiteContent/{contentId}": {
+      "schema": "websiteContent",
+      "description": "Public website CMS content."
+    }
+  }
+}
