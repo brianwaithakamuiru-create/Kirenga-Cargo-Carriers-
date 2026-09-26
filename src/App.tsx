@@ -23,7 +23,7 @@ import { CustomerPortal } from './components/customer/CustomerPortal';
 import { DriverPortal } from './components/driver/DriverPortal';
 import { WorkerPortal } from './components/worker/WorkerPortal';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Lock, Headphones, Phone, Mail } from 'lucide-react';
+import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Headphones, Phone, Mail } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const [currentView, setCurrentView] = useState<string>('home');
