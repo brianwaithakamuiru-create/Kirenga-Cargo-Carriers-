@@ -82,6 +82,7 @@ interface AdminDashboardProps {
 export type AdminNavKey =
   | 'dashboard'
   | 'shipments'
+  | 'quotes'
   | 'tracking'
   | 'fleet'
   | 'drivers'
@@ -114,6 +115,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     if (clean === 'activity' || clean === 'security') return 'security';
     if (clean === 'workforce') return 'workforce';
     if (clean === 'shipments') return 'shipments';
+    if (clean === 'quotes' || clean === 'quotations') return 'quotes';
     if (clean === 'tracking') return 'tracking';
     if (clean === 'fleet') return 'fleet';
     if (clean === 'drivers') return 'drivers';
@@ -540,21 +542,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   }[] = [
     { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { key: 'shipments', label: 'Shipments', icon: Package, badge: activeShipments.length },
-    { key: 'tracking', label: 'Live Tracking', icon: Navigation },
+    { key: 'quotes', label: 'Quotes', icon: FileCheck, badge: pendingQuotes.length },
+    { key: 'tracking', label: 'Cargo Tracking', icon: Navigation },
     { key: 'fleet', label: 'Fleet', icon: Truck, badge: vehicles.length },
     { key: 'drivers', label: 'Drivers', icon: Compass, badge: drivers.length },
     { key: 'staff', label: 'Staff', icon: Briefcase },
     { key: 'customers', label: 'Customers', icon: Users, badge: clients.length },
     { key: 'finance', label: 'Finance', icon: DollarSign, badge: unpaidInvoices.length },
-    { key: 'documents', label: 'Documents', icon: FileText, badge: expiringDocs.length },
+    { key: 'documents', label: 'Documents & Compliance', icon: FileText, badge: expiringDocs.length },
     { key: 'routes', label: 'Routes', icon: RouteIcon },
     { key: 'checkpoints', label: 'Checkpoints & Borders', icon: Navigation },
     { key: 'branches', label: 'Branches & Offices', icon: Building2 },
     { key: 'warehouse', label: 'Warehouse', icon: Layers },
     { key: 'reports', label: 'Reports', icon: BarChart3 },
     { key: 'notifications', label: 'Notifications', icon: Bell, badge: pendingBookings.length },
-    { key: 'website', label: 'Website Control', icon: Globe },
-    { key: 'appearance', label: 'Appearance & Permissions', icon: Palette },
+    { key: 'website', label: 'Website Manager', icon: Globe },
+    { key: 'appearance', label: 'Branding & Theme', icon: Palette },
     { key: 'settings', label: 'Settings', icon: Settings },
     { key: 'security', label: 'Security', icon: Shield },
   ];
@@ -597,7 +600,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         {/* Vertical Nav List (TOP TO BOTTOM) */}
         <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin scrollbar-thumb-slate-800">
           <div className="px-3 pb-2 text-[10px] font-mono uppercase text-slate-500 tracking-wider">
-            Operational Navigation
+            Central Command
           </div>
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -1311,6 +1314,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
             ============================================================ */}
         {activeNav === 'shipments' && (
           <CargoOperations initialSubTab="shipments" onRefreshStats={loadAllData} />
+        )}
+
+        {/* ============================================================
+            SECTION: QUOTES
+            ============================================================ */}
+        {activeNav === 'quotes' && (
+          <CommercialManagement initialSubTab="quotes" onRefreshStats={loadAllData} />
         )}
 
         {/* ============================================================
