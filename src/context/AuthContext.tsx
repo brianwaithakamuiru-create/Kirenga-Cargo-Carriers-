@@ -42,6 +42,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const profileCacheRef = useRef(new Map<string, UserProfile>());
+  const persistenceRef = useRef<boolean | null>(null);
+
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
     id: 'general',
     companyName: 'Kirenga Cargo Carriers',
@@ -63,9 +66,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   // Fetch Firestore profile for an authenticated user
   const loadProfile = async (uid: string): Promise<UserProfile | null> => {
+    const cached = profileCacheRef.current.get(uid);
+    if (cached) {
+      setUserProfile(cached);
+      return cached;
+    }
     try {
       const profile = await db.getUserProfile(uid);
       if (profile) {
+        profileCacheRef.current.set(uid, profile);
         setUserProfile(profile);
         return profile;
       }
@@ -128,6 +137,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             await db.updateUserProfile(user.uid, { role: 'ADMIN', status: 'ACTIVE' });
             profile.role = 'ADMIN';
             profile.status = 'ACTIVE';
+            profileCacheRef.current.set(user.uid, profile);
             setUserProfile(profile);
           }
         }
@@ -142,6 +152,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
         }
       } else {
+        profileCacheRef.current.clear();
         setUserProfile(null);
         setIsSessionLocked(false);
       }
@@ -181,8 +192,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const input = emailOrUsername.trim();
     let emailToUse = input;
 
-    // Set auth persistence based on Remember Me preference
-    await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+    // Configure Firebase persistence only when the user's preference changes.
+    // Avoid repeating the IndexedDB/session setup on every login attempt.
+    if (persistenceRef.current !== remember) {
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
+      persistenceRef.current = remember;
+    }
 
     let prospectiveUser: UserProfile | null = null;
 
@@ -385,6 +400,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     const nowIso = new Date().toISOString();
     profile.failedLoginAttempts = 0;
     profile.lastLoginAt = nowIso;
+    profileCacheRef.current.set(authUser.uid, profile);
     setUserProfile(profile);
     setIsSessionLocked(false);
 
