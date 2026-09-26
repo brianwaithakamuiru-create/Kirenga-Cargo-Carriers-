@@ -150,6 +150,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [documents, setDocuments] = useState<LogisticsDocument[]>([]);
+  const [dataError, setDataError] = useState<string | null>(null);
 
   // Dispatch Trip Modal State
   const [showDispatchModal, setShowDispatchModal] = useState(false);
@@ -162,10 +163,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   // Add Vehicle Modal State
   const [showAddVehicleModal, setShowAddVehicleModal] = useState(false);
   const [newReg, setNewReg] = useState('');
-  const [newType, setNewType] = useState('Heavy Prime Mover (6x4)');
-  const [newMake, setNewMake] = useState('Scania');
-  const [newModel, setNewModel] = useState('R500');
-  const [newCapacity, setNewCapacity] = useState('38000');
+  const [newType, setNewType] = useState('');
+  const [newMake, setNewMake] = useState('');
+  const [newModel, setNewModel] = useState('');
+  const [newCapacity, setNewCapacity] = useState('');
 
   // Notification Composer Modal/Form State
   const [composeTitle, setComposeTitle] = useState('');
@@ -224,11 +225,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
   };
 
   useEffect(() => {
-    void loadAllData();
-    // A wildcard Firestore subscription caused unnecessary full refreshes and
-    // attempted to subscribe to a non-existent "*" collection. Use the manual
-    // refresh action instead of repeatedly downloading every collection.
-    return undefined;
+    const sources: { collection: string; apply: (items: any[]) => void }[] = [
+      { collection: COLLECTIONS.BOOKINGS, apply: (items) => setBookings(items as Booking[]) },
+      { collection: COLLECTIONS.SHIPMENTS, apply: (items) => setShipments(items as Shipment[]) },
+      { collection: COLLECTIONS.TRIPS, apply: (items) => setTrips(items as Trip[]) },
+      { collection: COLLECTIONS.DRIVERS, apply: (items) => setDrivers(items as Driver[]) },
+      { collection: COLLECTIONS.VEHICLES, apply: (items) => setVehicles(items as Vehicle[]) },
+      { collection: COLLECTIONS.QUOTES, apply: (items) => setQuotes(items as Quote[]) },
+      { collection: COLLECTIONS.INVOICES, apply: (items) => setInvoices(items as Invoice[]) },
+      { collection: COLLECTIONS.DRIVER_EXPENSES, apply: (items) => setExpenses(items as DriverExpense[]) },
+      { collection: COLLECTIONS.VEHICLE_ISSUES, apply: (items) => setVehicleIssues(items as VehicleIssue[]) },
+      { collection: COLLECTIONS.SUPPORT_TICKETS, apply: (items) => setTickets(items as SupportTicket[]) },
+      { collection: COLLECTIONS.CONTACT_MESSAGES, apply: (items) => setContactMessages(items as ContactMessage[]) },
+      { collection: COLLECTIONS.ACTIVITY_LOGS, apply: (items) => setActivityLogs(items as ActivityLog[]) },
+      { collection: COLLECTIONS.CLIENTS, apply: (items) => setClients(items as Client[]) },
+      { collection: COLLECTIONS.DOCUMENTS, apply: (items) => setDocuments(items as LogisticsDocument[]) },
+    ];
+    const initialized = new Set<string>();
+    const markInitialized = (name: string) => {
+      initialized.add(name);
+      if (initialized.size === sources.length) setLoading(false);
+    };
+    const unsubscribers = sources.map((source) =>
+      db.subscribe(
+        source.collection,
+        (items) => {
+          if (items) source.apply(items);
+          markInitialized(source.collection);
+        },
+        () => {
+          setDataError('Some live records could not be loaded. Check your connection and account permissions.');
+          markInitialized(source.collection);
+        }
+      )
+    );
+    return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
   }, []);
 
   // Convert Customer Booking to Official Shipment
@@ -321,6 +352,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     e.preventDefault();
     try {
       const now = new Date().toISOString();
+      if (!newReg.trim() || !newType.trim() || !newMake.trim() || !newModel.trim() || Number(newCapacity) <= 0) {
+        triggerToast('Enter the registration, vehicle type, make, model, and a valid payload capacity.');
+        return;
+      }
       await db.add<Vehicle>(COLLECTIONS.VEHICLES, {
         id: `veh_${Date.now()}`,
         registrationNumber: newReg.trim().toUpperCase(),
@@ -329,13 +364,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
         model: newModel,
         capacityKg: Number(newCapacity),
         status: 'AVAILABLE',
-        currentLocation: 'Kampala Yard',
-        operatingCountries: ['Uganda', 'Tanzania', 'Kenya', 'Rwanda', 'Congo'],
-        lastServiceDate: now.split('T')[0],
         createdAt: now,
       });
       setShowAddVehicleModal(false);
       setNewReg('');
+      setNewType('');
+      setNewMake('');
+      setNewModel('');
+      setNewCapacity('');
       triggerToast('Vehicle registered in Fleet Management');
       loadAllData();
     } catch (err: any) {
@@ -343,7 +379,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     }
   };
 
-  // Send Authorized Broadcast / Notification
+  // Deliver a Firestore notification to each active account in the selected audience.
   const handleSendNotification = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!composeTitle.trim() || !composeMessage.trim()) {
@@ -352,21 +388,64 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     }
     setSendingNotification(true);
     try {
-      const now = new Date().toISOString();
-      await db.logActivity({
-        action: `Notification: ${composeTitle.trim()}`,
-        actor: userProfile?.fullName || 'Administrator',
-        role: 'ADMIN',
-        relatedRecordType: 'OPERATION',
-        details: `[Target: ${composeTarget} | Priority: ${composePriority}] ${composeMessage.trim()}`,
+      const users = await db.getAllUsers();
+      const activeUsers = users.filter((user) => {
+        const status = (user.status || '').toLowerCase();
+        const role = (user.role || '').toLowerCase();
+        if (!user.uid || !['active'].includes(status)) return false;
+        if (composeTarget === 'DRIVERS') return role === 'driver';
+        if (composeTarget === 'STAFF') return ['staff', 'worker', 'operations', 'finance', 'support'].includes(role);
+        if (composeTarget === 'CUSTOMERS') return role === 'customer';
+        return true;
       });
 
-      triggerToast(`Broadcast notification dispatched to ${composeTarget}.`);
-      setComposeTitle('');
-      setComposeMessage('');
-      loadAllData();
+      if (activeUsers.length === 0) {
+        triggerToast(`No active accounts are available for the ${composeTarget.toLowerCase()} audience.`);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const results = await Promise.allSettled(activeUsers.map((user) =>
+        db.add(COLLECTIONS.NOTIFICATIONS, {
+          id: `notification_${user.uid}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          userId: user.uid,
+          title: composeTitle.trim(),
+          message: composeMessage.trim(),
+          type: 'SYSTEM',
+          priority: composePriority,
+          audience: composeTarget,
+          read: false,
+          createdBy: currentUser?.uid || '',
+          createdAt: now,
+          updatedAt: now,
+        })
+      ));
+      const sent = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.length - sent;
+
+      if (sent > 0) {
+        try {
+          await db.logActivity({
+            action: `Notification: ${composeTitle.trim()}`,
+            actor: userProfile?.fullName || 'Administrator',
+            role: 'ADMIN',
+            relatedRecordType: 'OPERATION',
+            details: `[Target: ${composeTarget} | Priority: ${composePriority}] Delivered to ${sent} active account(s).`,
+          });
+        } catch (auditError) {
+          console.error('Notification was sent, but its activity record could not be saved:', auditError);
+        }
+        setComposeTitle('');
+        setComposeMessage('');
+        triggerToast(failed
+          ? `Sent to ${sent} account(s); ${failed} could not be reached.`
+          : `Notification sent to ${sent} active account(s).`);
+        loadAllData();
+      } else {
+        throw new Error('Firestore rejected the notification records. Check the active security rules and try again.');
+      }
     } catch (err: any) {
-      triggerToast(`Failed to send notification: ${err.message}`);
+      triggerToast(`Failed to send notification: ${err.message || 'Please try again.'}`);
     } finally {
       setSendingNotification(false);
     }
@@ -622,6 +701,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
           MAIN WORKPLACE VIEW AREA
           ============================================================ */}
       <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 overflow-y-auto">
+        {dataError && (
+          <div role="alert" className="mb-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {dataError}
+            <button onClick={() => { setDataError(null); window.location.reload(); }} className="ml-3 underline underline-offset-2">Retry</button>
+          </div>
+        )}
         {/* GLOBAL COMMAND SEARCH STRIP */}
         <div className="mb-6 relative">
           <div className="flex items-center gap-3 bg-[#0A1024]/90 border border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl backdrop-blur-md">
@@ -1627,9 +1712,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 />
               </div>
               <div>
-                <label className="block text-slate-300 mb-1">Vehicle Type</label>
+                <label className="block text-slate-300 mb-1">Vehicle Type *</label>
                 <input
                   type="text"
+                  required
                   value={newType}
                   onChange={(e) => setNewType(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1640,6 +1726,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   <label className="block text-slate-300 mb-1">Make</label>
                   <input
                     type="text"
+                    required
                     value={newMake}
                     onChange={(e) => setNewMake(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1649,6 +1736,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                   <label className="block text-slate-300 mb-1">Model</label>
                   <input
                     type="text"
+                    required
                     value={newModel}
                     onChange={(e) => setNewModel(e.target.value)}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white"
@@ -1659,6 +1747,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
                 <label className="block text-slate-300 mb-1">Payload Capacity (KG)</label>
                 <input
                   type="number"
+                  min="1"
+                  required
                   value={newCapacity}
                   onChange={(e) => setNewCapacity(e.target.value)}
                   className="w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-xl text-white font-mono"
