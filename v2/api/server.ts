@@ -1,0 +1,6 @@
+import express from 'express';
+const app=express(); app.use(express.json({limit:'1mb'}));
+app.get('/api/health',(_req,res)=>res.json({ok:true,service:'kerenga-cargo-couriers-v2',timestamp:new Date().toISOString()}));
+app.post('/api/track',async(req,res)=>{const{trackingNumber,phone}=req.body??{};if(!trackingNumber||!phone)return res.status(400).json({error:'Tracking reference and phone are required.'});return res.json({trackingNumber,status:'IN_TRANSIT',message:'Sample response. Connect Firebase Admin SDK before production use.'});});
+app.post('/api/bookings',async(req,res)=>{const{senderName,phone,origin,destination,cargoDescription,weightKg,packages}=req.body??{};if(!senderName||!phone||!origin||!destination||!cargoDescription)return res.status(400).json({error:'Required booking fields are missing.'});const reference='KCC-'+new Date().getFullYear()+'-'+Math.floor(1000+Math.random()*9000);return res.status(201).json({reference,status:'PENDING',message:'Sample booking accepted. Persist it with Firestore in production.',shipment:{senderName,phone,origin,destination,cargoDescription,weightKg,packages}});});
+const port=Number(process.env.PORT||8787);app.listen(port,()=>console.log('Kerenga API listening on :'+port));
