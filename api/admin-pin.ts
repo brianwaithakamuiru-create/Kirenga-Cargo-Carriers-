@@ -26,7 +26,7 @@ function getHeader(request: Request, name: string) { const value = request.heade
 function getBearerToken(request: Request) {
   const authorization = getHeader(request, 'authorization') || getHeader(request, 'Authorization');
   if (!authorization) return null;
-  const match = authorization.match(/^Bearer\\s+(.+)$/i);
+  const match = authorization.match(/^Bearer\s+(.+)$/i);
   return match?.[1] || null;
 }
 
@@ -75,7 +75,7 @@ export default async function handler(request: Request, response: Response) {
   }
 
   const { pin } = parseBody(request.body);
-  if (typeof pin !== 'string' || !/^\\d{5}$/.test(pin)) {
+  if (typeof pin !== 'string' || !/^\d{5}$/.test(pin)) {
     return response.status(400).json({ error: 'Enter the five-digit administrator PIN.' });
   }
 
