@@ -45,9 +45,7 @@ export default async function handler(request: Request, response: Response) {
   }
 
   try {
-    if (!safeEqual(pin, configuredPin)) return response.status(401).json({ error: 'Incorrect administrator PIN.' });
-
-    // Keep the short PIN protected against rapid guessing.
+    // Keep the short PIN protected against rapid guessing. Count failed attempts too.
     const app = getAdminApp();
     const firestore = getFirestore(app);
     const forwardedFor = getHeader(request, 'x-forwarded-for');
@@ -67,6 +65,7 @@ export default async function handler(request: Request, response: Response) {
       return true;
     });
     if (!allowed) return response.status(429).json({ error: 'Too many PIN attempts. Try again in 15 minutes.' });
+    if (!safeEqual(pin, configuredPin)) return response.status(401).json({ error: 'Incorrect administrator PIN.' });
 
     const adminAuth = getAuth(app);
     let adminUser;
