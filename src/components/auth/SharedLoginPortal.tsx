@@ -62,7 +62,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
     const cleanIdentifier = emailOrUsername.trim();
     if (!cleanIdentifier) {
-      setError('Please enter your email or assigned username.');
+      setError('Please enter your registered email address.');
       return;
     }
     if (!password) {
@@ -231,7 +231,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
             {/* Email or Username */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
-                Email or username
+                Email address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -241,7 +241,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                   type="text"
                   value={emailOrUsername}
                   onChange={(e) => setEmailOrUsername(e.target.value)}
-                  placeholder="Enter email or assigned username"
+                  placeholder="Enter your registered email address"
                   className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-sans"
                   autoComplete="username"
                   required
@@ -409,7 +409,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                     type="email"
                     value={forgotInput}
                     onChange={(e) => setForgotInput(e.target.value)}
-                    placeholder="e.g. driver@kerengacargo.com"
+                    placeholder="e.g. driver@kirengacargo.com"
                     className="w-full px-3.5 py-2.5 bg-slate-950/80 border border-slate-700 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400"
                     required
                   />
