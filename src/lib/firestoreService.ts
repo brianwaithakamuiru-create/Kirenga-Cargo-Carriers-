@@ -198,6 +198,18 @@ class FirestoreService {
     return null;
   }
 
+  public async set<T = any>(col: string, id: string, item: T): Promise<void> {
+    const now = new Date().toISOString();
+    const data = {
+      createdAt: (item as any).createdAt || now,
+      updatedAt: (item as any).updatedAt || now,
+      ...(item as any),
+      id,
+    };
+    await setDoc(doc(firestore, col, id), data);
+    this.writeCollection(col, []);
+  }
+
   public async add<T = any>(
     col: string,
     item: T | any
