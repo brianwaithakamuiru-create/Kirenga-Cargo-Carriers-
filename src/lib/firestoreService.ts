@@ -86,6 +86,7 @@ export const COLLECTIONS = {
   SERVICES: 'services',
   COUNTRIES: 'countries',
   ROUTES: 'routes',
+  BRANCHES: 'branches',
   BRANDING: 'branding',
   COMPANY_SETTINGS: 'companySettings',
   ANIMATION_SETTINGS: 'websiteSettings',
