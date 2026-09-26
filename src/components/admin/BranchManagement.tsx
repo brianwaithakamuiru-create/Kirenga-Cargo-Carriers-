@@ -52,7 +52,7 @@ export const BranchManagement: React.FC = () => {
     setLoading(true);
     setLoadError('');
     try {
-      const records = await db.getAll<CompanyBranch>(COLLECTIONS.BRANCHES);
+      const records = await db.getAllStrict<CompanyBranch>(COLLECTIONS.BRANCHES);
       setBranches(records);
     } catch {
       setLoadError('Branches could not be loaded. Check the connection and try again.');
