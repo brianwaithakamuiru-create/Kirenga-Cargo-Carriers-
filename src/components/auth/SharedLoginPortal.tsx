@@ -28,11 +28,12 @@ interface SharedLoginPortalProps {
 }
 
 export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
-  const { signIn, signInWithGoogle, signInWithAdminProvider, signInWithAdminPin, sendPasswordReset } = useAuth();
+  const { currentUser, userProfile, adminPinVerified, signIn, signInWithGoogle, signInWithAdminProvider, signInWithAdminPin, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [adminPin, setAdminPin] = useState('');
+  const [adminPinStage, setAdminPinStage] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [selectedPortal, setSelectedPortal] = useState<'driver' | 'staff' | 'admin'>('staff');
@@ -46,6 +47,15 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSuccess, setForgotSuccess] = useState<string | null>(null);
   const [forgotError, setForgotError] = useState<string | null>(null);
+  React.useEffect(() => {
+    if (currentUser && userProfile?.role?.toLowerCase() === 'admin' && !adminPinVerified) {
+      setSelectedPortal('admin');
+      setAdminPinStage(true);
+    } else if (!currentUser) {
+      setAdminPinStage(false);
+    }
+  }, [currentUser, userProfile, adminPinVerified]);
+
   const [forgotStatusType, setForgotStatusType] = useState<
     'idle' | 'email-sent' | 'invalid-email' | 'not-found' | 'too-many-requests' | 'network-error'
   >('idle');
@@ -77,17 +87,21 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
       const expectedRole = selectedPortal;
       const profile = await signIn(cleanIdentifier, password, rememberMe, expectedRole);
 
-      // Check temporary password flow first
+      // Administrator authentication is intentionally two-step:
+      // Firebase email/password -> role verification -> backend PIN verification.
+      if ((profile.role || '').toLowerCase() === 'admin') {
+        setAdminPin('');
+        setAdminPinStage(true);
+        return;
+      }
+
       if (profile.mustChangePassword) {
         onNavigate('change-password');
         return;
       }
 
       const role = (profile.role || '').toLowerCase();
-      // Automated role-based routing directly verified from Firestore
-      if (role === 'admin') {
-        onNavigate('admin');
-      } else if (role === 'driver') {
+      if (role === 'driver') {
         onNavigate('driver');
       } else if (role === 'staff' || role === 'worker' || role === 'operations' || role === 'finance' || role === 'support') {
         onNavigate('staff');
@@ -116,9 +130,10 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
     setLoading(true);
     try {
       await signInWithAdminPin(pin);
+      setAdminPinStage(false);
       onNavigate('admin/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Administrator PIN sign-in failed. Please try again.');
+      setError(err.message || 'Incorrect Admin PIN. Access denied.');
     } finally {
       setLoading(false);
     }
@@ -287,22 +302,94 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
           </div>
 
 
-          {selectedPortal === 'admin' && (
-            <form onSubmit={handleAdminPinSignIn} className="mt-5 space-y-5">
+          {selectedPortal === 'admin' && !adminPinStage && (
+            <form onSubmit={handleSubmit} className="mt-5 space-y-5">
               <div className="flex items-center gap-3 mb-2 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
                 <span className="h-px flex-1 bg-slate-800" />
-                <span>Administrator PIN</span>
+                <span>Administrator Authentication</span>
                 <span className="h-px flex-1 bg-slate-800" />
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
-                  Administrator PIN
+                  Administrator Email
+                </label>
+                <input
+                  type="email"
+                  value={emailOrUsername}
+                  onChange={(e) => setEmailOrUsername(e.target.value)}
+                  placeholder="Administrator email"
+                  autoComplete="username"
+                  className="w-full px-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
+                  Password
                 </label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
-                    <Shield className="w-4 h-4" />
-                  </div>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Administrator password"
+                    autoComplete="current-password"
+                    className="w-full px-4 pr-11 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-cyan-300"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs text-slate-400">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-slate-700 bg-slate-950"
+                />
+                Keep me signed in on this device
+              </label>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 text-white font-bold text-sm shadow-xl shadow-cyan-600/30 flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {loading ? (
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Verifying administrator...</span></>
+                ) : (
+                  <><span>Continue to Security Verification</span><ArrowRight className="w-4 h-4" /></>
+                )}
+              </button>
+            </form>
+          )}
+
+          {selectedPortal === 'admin' && adminPinStage && (
+            <form onSubmit={handleAdminPinSignIn} className="mt-5 space-y-5">
+              <div className="text-center space-y-2">
+                <div className="mx-auto w-12 h-12 rounded-2xl bg-cyan-950/70 border border-cyan-400/30 flex items-center justify-center text-cyan-300">
+                  <Shield className="w-6 h-6" />
+                </div>
+                <div className="text-[10px] uppercase tracking-[0.25em] text-cyan-400 font-mono">KIRENGA CARGO</div>
+                <h2 className="text-lg font-bold text-white font-['Poppins']">ADMIN SECURITY VERIFICATION</h2>
+                <p className="text-xs text-slate-400">Enter your Admin PIN to open Central Command.</p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2 font-mono">
+                  Admin PIN
+                </label>
+                <div className="relative">
                   <input
                     type="password"
                     inputMode="numeric"
@@ -310,38 +397,41 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
                     maxLength={5}
                     value={adminPin}
                     onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
-                    placeholder="Enter 5-digit PIN"
+                    placeholder="Enter PIN"
                     autoComplete="one-time-code"
-                    className="w-full pl-10 pr-4 py-3 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 transition-all font-mono tracking-[0.35em]"
+                    autoFocus
+                    className="w-full px-4 py-4 bg-[#050915] border border-slate-700/80 rounded-xl text-white text-center text-lg placeholder-slate-600 focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 font-mono tracking-[0.45em]"
                     required
                   />
                 </div>
                 <p className="mt-2 text-[11px] text-slate-500 text-center">
-                  Use the administrator PIN assigned to the workplace.
+                  Secure verification is performed by the trusted backend.
                 </p>
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-sm shadow-xl shadow-cyan-600/30 flex items-center justify-center gap-2 transition-all transform active:scale-[0.99] disabled:opacity-60"
+                disabled={loading || adminPin.length !== 5}
+                className="w-full py-3.5 px-5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 text-white font-bold text-sm shadow-xl shadow-cyan-600/30 flex items-center justify-center gap-2 disabled:opacity-60"
               >
                 {loading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Connecting to workplace...</span>
-                  </>
+                  <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>Verifying secure PIN...</span></>
                 ) : (
-                  <>
-                    <span>Enter Administrator Workplace</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </>
+                  <><Lock className="w-4 h-4" /><span>Verify & Enter Admin Workplace</span></>
                 )}
               </button>
 
-              <p className="text-center text-[11px] leading-relaxed text-slate-500">
-                Secure PIN authentication is verified by the server and Firebase.
-              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminPinStage(false);
+                  setAdminPin('');
+                  setError(null);
+                }}
+                className="w-full text-xs text-slate-500 hover:text-cyan-300"
+              >
+                Back to administrator credentials
+              </button>
             </form>
           )}
 
