@@ -115,8 +115,8 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
     setLoading(true);
     try {
-      const profile = await signInWithAdminPin(pin);
-      onNavigate('admin');
+      await signInWithAdminPin(pin);
+      onNavigate('admin/dashboard');
     } catch (err: any) {
       setError(err.message || 'Administrator PIN sign-in failed. Please try again.');
     } finally {
