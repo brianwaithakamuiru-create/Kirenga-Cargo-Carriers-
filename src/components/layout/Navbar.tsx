@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Menu, X, Shield, Compass, Briefcase, LogOut, Lock, Search, PackageCheck } from 'lucide-react';
+import { Menu, X, Shield, Compass, Briefcase, LogOut, Search, PackageCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { CompanyLogo } from '../common/CompanyLogo';
 
@@ -23,14 +23,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
   ];
 
   const handlePortalRedirect = () => {
-    if (!currentUser) {
-      onNavigate('login');
-      return;
-    }
     if (role === 'admin') onNavigate('admin');
     else if (role === 'driver') onNavigate('driver');
     else if (role === 'worker' || role === 'staff') onNavigate('staff');
-    else onNavigate('login');
+    else onNavigate('home');
   };
 
   return (
@@ -79,19 +75,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, onNavigate }) => {
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
               </div>
-            ) : (
-              <button
-                onClick={() => onNavigate('login')}
-                className={`flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  currentView === 'login'
-                    ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-500/40'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Lock className="w-3 h-3 text-cyan-400" />
-                <span>Portal Sign In</span>
-              </button>
-            )}
+            ) : null
           </div>
         </div>
       </div>
