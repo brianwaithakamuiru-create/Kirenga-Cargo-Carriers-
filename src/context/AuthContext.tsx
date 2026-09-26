@@ -330,7 +330,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithAdminPin = async (pin: string, confirmation: string): Promise<UserProfile> => {
-    if (!/^\\d{5}$/.test(pin) || pin !== confirmation) {
+    if (!/^\d{5}$/.test(pin) || pin !== confirmation) {
       throw new Error('Enter the same five-digit PIN in both fields.');
     }
     const response = await fetch('/api/admin-pin', {
