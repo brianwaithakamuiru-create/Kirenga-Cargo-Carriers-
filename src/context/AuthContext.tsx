@@ -3,7 +3,6 @@ import {
   User,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithCustomToken,
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
@@ -35,6 +34,7 @@ interface AuthContextType {
   signIn: (emailOrUsername: string, pass: string, remember?: boolean, expectedRole?: 'admin' | 'customer' | 'driver' | 'staff') => Promise<UserProfile>;
   signInWithGoogle: () => Promise<UserProfile>;
   signInWithAdminPin: (pin: string) => Promise<UserProfile>;
+  adminPinVerified: boolean;
   signInWithAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<UserProfile>;
   linkGoogleAccount: () => Promise<void>;
   linkAdminProvider: (provider: 'apple.com' | 'microsoft.com') => Promise<void>;
@@ -57,6 +57,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isSessionLocked, setIsSessionLocked] = useState(false);
+  const [adminPinVerified, setAdminPinVerified] = useState(false);
   const profileCacheRef = useRef(new Map<string, UserProfile>());
   const profileLoadsRef = useRef(new Map<string, Promise<UserProfile | null>>());
   const persistenceRef = useRef<boolean | null>(null);
@@ -132,6 +133,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setCurrentUser(user);
       setUserProfile(null);
       setIsSessionLocked(false);
+      setAdminPinVerified(false);
       if (user) {
         const profile = await loadProfile(user.uid);
         // Admin provisioning/repair is handled during the explicit login flow.
@@ -139,6 +141,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
         // Enforce account status check
         if (profile) {
+          setAdminPinVerified((profile.role || '').toLowerCase() !== 'admin' ? true : false);
           const st = (profile.status || '').toLowerCase();
           if (st === 'inactive' || st === 'suspended' || st === 'locked') {
             await firebaseSignOut(auth);
@@ -334,6 +337,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     profileCacheRef.current.set(authUser.uid, profile);
     setUserProfile(profile);
     setIsSessionLocked(false);
+    setAdminPinVerified(actualRole !== 'admin');
 
     // Fire-and-forget: do not make dashboard navigation wait for audit writes.
     void db.logAudit({
@@ -348,52 +352,51 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const signInWithAdminPin = async (pin: string): Promise<UserProfile> => {
-    if (!/^\d{5}$/.test(pin)) {
+    if (!/^\\d{5}$/.test(pin)) {
       throw new Error('Enter the five-digit administrator PIN.');
     }
 
-    if (persistenceRef.current !== true) {
-      await setPersistence(auth, browserLocalPersistence);
-      persistenceRef.current = true;
+    const authenticatedUser = auth.currentUser;
+    if (!authenticatedUser) {
+      throw new Error('Your administrator credentials must be verified before entering the PIN.');
     }
 
-    const response = await fetch('/api/admin-pin', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ pin }),
-    });
-
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok || !result.token) {
-      throw new Error(result.error || 'Administrator PIN sign-in failed.');
-    }
-
-    let credential;
-    try {
-      credential = await signInWithCustomToken(auth, result.token);
-    } catch (error: any) {
-      throw new Error(error?.message || 'Firebase could not complete administrator sign-in.');
-    }
-
-    const profile = await db.getUserProfile(credential.user.uid);
+    const profile = await loadProfile(authenticatedUser.uid);
     if (!profile || profile.role?.toLowerCase() !== 'admin' || profile.status?.toLowerCase() !== 'active') {
       await firebaseSignOut(auth);
       setCurrentUser(null);
       setUserProfile(null);
-      throw new Error('The authenticated account is not an active administrator.');
+      setAdminPinVerified(false);
+      throw new Error('Administrator authorization could not be verified.');
     }
 
-    profileCacheRef.current.set(credential.user.uid, profile);
-    setCurrentUser(credential.user);
+    const idToken = await authenticatedUser.getIdToken();
+    const response = await fetch('/api/admin-pin', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + idToken,
+      },
+      body: JSON.stringify({ pin }),
+    });
+
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || result.success !== true) {
+      setAdminPinVerified(false);
+      throw new Error(result.error || 'Incorrect Admin PIN. Access denied.');
+    }
+
+    setCurrentUser(authenticatedUser);
     setUserProfile(profile);
+    setAdminPinVerified(true);
     setIsSessionLocked(false);
 
     void db.logAudit({
-      actorUid: credential.user.uid,
+      actorUid: authenticatedUser.uid,
       actorRole: 'ADMIN',
-      action: 'USER_LOGIN',
-      targetUid: credential.user.uid,
-      details: 'Administrator signed in with PIN.',
+      action: 'ADMIN_PIN_VERIFIED',
+      targetUid: authenticatedUser.uid,
+      details: 'Administrator PIN verification succeeded.',
     }).catch(() => {});
 
     return profile;
@@ -628,6 +631,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await firebaseSignOut(auth);
     setCurrentUser(null);
     setUserProfile(null);
+    setAdminPinVerified(false);
     setIsSessionLocked(false);
   };
 
@@ -796,6 +800,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         loading,
         isSessionLocked,
         mustChangePassword,
+        adminPinVerified,
         systemSettings,
         signIn,
         signInWithGoogle,
