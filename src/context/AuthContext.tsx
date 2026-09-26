@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   sendPasswordResetEmail,
+  sendEmailVerification,
   updatePassword as firebaseUpdatePassword,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -169,12 +170,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const normalizedEmail = emailToUse;
-    const isAdminEmail =
-      normalizedEmail === 'kirengacargo@gmail.com' ||
-      normalizedEmail === 'kirengacargoc@gmail.com' ||
-      normalizedEmail === 'kirengacargocariers@gmail.com' ||
-      normalizedEmail === 'kirengacarogocariers@gmail.com' ||
-      normalizedEmail === 'brianwaithakamuiru@gmail.com';
+    const isAdminEmail = normalizedEmail === 'kirengacargo@gmail.com';
 
     let authUser: User;
     try {
@@ -188,38 +184,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (isAdminEmail && (authErr.code === 'auth/user-not-found' || authErr.code === 'auth/invalid-credential')) {
         try {
           const newCred = await createUserWithEmailAndPassword(auth, emailToUse, pass);
-          authUser = newCred.user;
-          // Create the admin user profile in Firestore
-          const now = new Date().toISOString();
-          const adminDoc: UserProfile = {
-            id: authUser.uid,
-            uid: authUser.uid,
-            fullName: 'Kirenga Central Administrator',
-            username: emailToUse.split('@')[0],
-            email: emailToUse,
-            phone: '+256 700 000 000',
-            country: 'Uganda',
-            role: 'ADMIN',
-            status: 'ACTIVE',
-            department: 'Administration',
-            employeeId: 'KCC-ADM-001',
-            mustChangePassword: false,
-            failedLoginAttempts: 0,
-            lastLoginAt: now,
-            workplaces: ['admin', 'operations', 'driver', 'finance', 'support'],
-            createdAt: now,
-            updatedAt: now,
-          };
-          await db.saveUserProfile(adminDoc);
-          setUserProfile(adminDoc);
-          await db.logAudit({
-            actorUid: authUser.uid,
-            actorRole: 'ADMIN',
-            action: 'INITIAL_ADMIN_BOOTSTRAP',
-            targetUid: authUser.uid,
-            details: 'Initial administrator account securely initialized via Firebase Authentication.',
-          });
-          return adminDoc;
+          await sendEmailVerification(newCred.user);
+          await firebaseSignOut(auth);
+          throw new Error('A verification email was sent to the administrator address. Verify it, then sign in again to finish setup.');
         } catch (bootstrapErr: any) {
           if (bootstrapErr.code === 'auth/email-already-in-use') {
             throw new Error('Incorrect credentials. Please verify your email/username and password.');
@@ -257,6 +224,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     // If profile document does not exist yet for bootstrapped admin
     if (!profile) {
       if (isAdminEmail) {
+        if (!authUser.emailVerified) {
+          await sendEmailVerification(authUser).catch(() => {});
+          await firebaseSignOut(auth);
+          throw new Error('Verify the administrator email address before initializing its profile. Check your inbox, then sign in again.');
+        }
         const now = new Date().toISOString();
         profile = {
           id: authUser.uid,
@@ -283,12 +255,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
     }
 
-    // Ensure ADMIN role for administrator email
-    if (isAdminEmail && (profile.role !== 'ADMIN' || profile.status !== 'ACTIVE')) {
-      await db.updateUserProfile(authUser.uid, { role: 'ADMIN', status: 'ACTIVE' });
-      profile.role = 'ADMIN';
-      profile.status = 'ACTIVE';
-    }
+    // Existing profile role and status stay authoritative; bootstrap emails do not override them.
 
     // Strict Account Status Verification
     const statusNormalized = (profile.status || 'ACTIVE').toLowerCase();
