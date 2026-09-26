@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, AlertCircle, Clock, MapPin, Truck, User, CheckCircle2, Shield, Calendar, Package, ArrowRight, RefreshCw, Compass } from 'lucide-react';
 import { db, COLLECTIONS } from '../../lib/firestoreService';
-import { Shipment } from '../../types';
+import { PublicShipmentTracking } from '../../types';
 import { CargoTrackingAnimation } from '../common/CargoTrackingAnimation';
 import { StatusBadge } from '../common/StatusBadge';
 import { AnimatedTruck } from '../common/AnimatedTruck';
@@ -17,25 +17,10 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
 }) => {
   const [trackingNumber, setTrackingNumber] = useState(initialTrackingNumber);
   const [loading, setLoading] = useState(false);
-  const [shipment, setShipment] = useState<Shipment | null>(null);
-  const [recentShipments, setRecentShipments] = useState<Shipment[]>([]);
+  const [shipment, setShipment] = useState<PublicShipmentTracking | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showMap, setShowMap] = useState(false);
-
-  // Load sample available shipments from Firestore for convenience
-  useEffect(() => {
-    (async () => {
-      try {
-        const all = await db.getAll<Shipment>(COLLECTIONS.SHIPMENTS);
-        if (all && all.length > 0) {
-          setRecentShipments(all.slice(0, 3));
-        }
-      } catch {
-        // Silent
-      }
-    })();
-  }, []);
 
   const handleTrack = async (customCode?: string) => {
     const code = (customCode || trackingNumber).trim();
@@ -74,11 +59,8 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
   // Subscribe to real-time updates for active shipment
   useEffect(() => {
     if (!shipment) return;
-    const unsubscribe = db.subscribe(COLLECTIONS.SHIPMENTS, async () => {
-      const refreshed = await db.getShipmentByNumber(shipment.shipmentNumber);
-      if (refreshed) {
-        setShipment(refreshed);
-      }
+    const unsubscribe = db.subscribeShipmentTracking(shipment.shipmentNumber, (refreshed) => {
+      setShipment(refreshed);
     });
     return () => unsubscribe();
   }, [shipment?.shipmentNumber]);
@@ -137,26 +119,6 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
           </button>
         </form>
 
-        {/* Quick sample buttons for real shipments in Firestore */}
-        {recentShipments.length > 0 && !shipment && (
-          <div className="mt-5 pt-4 border-t border-slate-800/80 max-w-2xl mx-auto flex flex-wrap items-center justify-center gap-2 text-xs">
-            <span className="text-slate-400 text-[11px] font-mono">Sample Active Consignments:</span>
-            {recentShipments.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => {
-                  setTrackingNumber(s.shipmentNumber);
-                  handleTrack(s.shipmentNumber);
-                }}
-                className="px-2.5 py-1 rounded-lg bg-slate-900 border border-cyan-500/30 text-cyan-300 font-mono text-[11px] hover:bg-slate-800 transition-colors"
-              >
-                {s.shipmentNumber}
-              </button>
-            ))}
-          </div>
-        )}
-
         {/* Error message */}
         {error && (
           <div className="mt-5 p-4 rounded-xl bg-rose-950/60 border border-rose-500/40 text-rose-300 text-xs flex items-center gap-3 max-w-2xl mx-auto animate-fadeIn">
@@ -182,9 +144,7 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
                 <h3 className="text-2xl sm:text-3xl font-black text-white font-mono">
                   {shipment.shipmentNumber}
                 </h3>
-                <p className="text-xs text-slate-400">
-                  Shipper: <strong className="text-slate-200">{shipment.customerName}</strong>
-                </p>
+                <p className="text-xs text-slate-400">Public shipment status</p>
               </div>
 
               {/* Action buttons */}
@@ -232,7 +192,7 @@ export const TrackingBox: React.FC<TrackingBoxProps> = ({
                 </span>
                 <div className="flex items-center gap-1.5 text-white font-bold">
                   <Package className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-                  <span className="truncate">{shipment.cargoDescription || shipment.cargoType}</span>
+                  <span className="truncate">{shipment.cargoType}</span>
                 </div>
               </div>
 
