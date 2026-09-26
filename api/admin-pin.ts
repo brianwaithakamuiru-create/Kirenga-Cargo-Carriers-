@@ -24,13 +24,19 @@ function getHeader(request: ApiRequest, name: string): string | undefined {
 
 function getAdminApp() {
   const credentialJson = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!credentialJson) throw new Error('Admin PIN service is not configured.');
+  if (!credentialJson) {
+    const error = new Error('FIREBASE_SERVICE_ACCOUNT is missing.');
+    error.name = 'AdminPinConfigurationError';
+    throw error;
+  }
 
   let credential: { project_id?: string };
   try {
     credential = JSON.parse(credentialJson);
   } catch {
-    throw new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
+    const error = new Error('FIREBASE_SERVICE_ACCOUNT is not valid JSON.');
+    error.name = 'AdminPinConfigurationError';
+    throw error;
   }
 
   return getApps()[0] || initializeApp({
@@ -165,10 +171,41 @@ export default async function handler(request: ApiRequest, response: ApiResponse
 
     const token = await adminAuth.createCustomToken(adminUser.uid);
     return response.status(200).json({ token });
-  } catch (error) {
+  } catch (error: any) {
+    const code = typeof error?.code === 'string' ? error.code : '';
+    const message = error instanceof Error ? error.message : '';
+
+    // Return safe, actionable diagnostics without exposing credentials, tokens,
+    // service-account contents, or internal stack traces.
+    if (error?.name === 'AdminPinConfigurationError') {
+      console.error('Admin PIN configuration error:', message);
+      return response.status(503).json({ error: message });
+    }
+
+    if (code === 'auth/user-not-found') {
+      console.error('Admin PIN configuration error: administrator Firebase Auth account was not found.');
+      return response.status(503).json({
+        error: 'Administrator Firebase account was not found. Verify kirengacargo@gmail.com exists in Firebase Authentication.',
+      });
+    }
+
+    if (code === 'permission-denied' || code === '7') {
+      console.error('Admin PIN configuration error: Firebase service account lacks Firestore permission.');
+      return response.status(503).json({
+        error: 'Firebase service account cannot access Firestore. Check its project and permissions.',
+      });
+    }
+
+    if (code === 'auth/invalid-credential' || code === 'app/invalid-credential') {
+      console.error('Admin PIN configuration error: Firebase service-account credential was rejected.');
+      return response.status(503).json({
+        error: 'Firebase service-account credentials were rejected. Verify FIREBASE_SERVICE_ACCOUNT belongs to the kirenga-cargo project.',
+      });
+    }
+
     console.error('Admin PIN sign-in failed:', error);
     return response.status(503).json({
-      error: 'PIN sign-in is temporarily unavailable. Please try again later.',
+      error: 'PIN sign-in is temporarily unavailable. Check the Vercel Firebase environment variables and try again.',
     });
   }
 }
