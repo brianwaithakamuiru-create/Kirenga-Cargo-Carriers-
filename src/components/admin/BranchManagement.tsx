@@ -62,8 +62,19 @@ export const BranchManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    void loadBranches();
-    const unsubscribe = db.subscribe(COLLECTIONS.BRANCHES, loadBranches);
+    const unsubscribe = db.subscribe(
+      COLLECTIONS.BRANCHES,
+      (items) => {
+        if (!items) return;
+        setBranches(items as CompanyBranch[]);
+        setLoadError('');
+        setLoading(false);
+      },
+      () => {
+        setLoadError('Branches could not be loaded. Check the connection and account permissions, then retry.');
+        setLoading(false);
+      }
+    );
     return unsubscribe;
   }, []);
 
