@@ -28,14 +28,12 @@ interface SharedLoginPortalProps {
 }
 
 export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate }) => {
-  const { signIn, signInWithGoogle, signInWithAdminPin, signInWithAdminProvider, sendPasswordReset } = useAuth();
+  const { signIn, signInWithGoogle, signInWithAdminProvider, sendPasswordReset } = useAuth();
 
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
-  const [adminPin, setAdminPin] = useState('');
-  const [adminPinConfirmation, setAdminPinConfirmation] = useState('');
   const [selectedPortal, setSelectedPortal] = useState<'driver' | 'staff' | 'admin'>('staff');
 
   const [loading, setLoading] = useState(false);
@@ -99,22 +97,6 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please verify your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAdminPinSignIn = async (event: React.FormEvent) => {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-    try {
-      await signInWithAdminPin(adminPin, adminPinConfirmation);
-      onNavigate('admin');
-    } catch (err: any) {
-      setError(err.message || 'PIN sign-in failed. Please try again.');
-      setAdminPin('');
-      setAdminPinConfirmation('');
     } finally {
       setLoading(false);
     }
@@ -285,7 +267,7 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
 
           {selectedPortal === 'admin' && (
             <p className="mb-4 -mt-3 text-center text-xs text-cyan-200">
-              Use either authorized Google account: <strong>kirengacargo@gmail.com</strong> or <strong>brianwaithakamuiru@gmail.com</strong>
+              Administrator access uses a verified authorized identity. No PIN or password is required at sign-in.
             </p>
           )}
 
@@ -395,21 +377,6 @@ export const SharedLoginPortal: React.FC<SharedLoginPortalProps> = ({ onNavigate
               )}
             </button>
           </form>}
-          {selectedPortal === 'admin' && (
-            <form onSubmit={handleAdminPinSignIn} className="space-y-4 mb-5">
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Administrator PIN
-                <input type="password" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} autoComplete="off" value={adminPin} onChange={(event) => setAdminPin(event.target.value.replace(/\D/g, '').slice(0, 5))} required aria-label="Five-digit administrator PIN" placeholder="Enter 5-digit PIN" className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-center text-lg font-mono tracking-[0.5em] text-white placeholder:text-slate-500 placeholder:tracking-normal" />
-              </label>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider">
-                Repeat administrator PIN
-                <input type="password" inputMode="numeric" pattern="[0-9]{5}" maxLength={5} autoComplete="off" value={adminPinConfirmation} onChange={(event) => setAdminPinConfirmation(event.target.value.replace(/\D/g, '').slice(0, 5))} required aria-label="Repeat five-digit administrator PIN" placeholder="Repeat 5-digit PIN" className="mt-2 w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-center text-lg font-mono tracking-[0.5em] text-white placeholder:text-slate-500 placeholder:tracking-normal" />
-              </label>
-              <button type="submit" disabled={loading} className="w-full rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-teal-500 px-5 py-3.5 text-sm font-bold text-white disabled:opacity-60">
-                {loading ? 'Verifying PIN…' : 'Sign in with PIN'}
-              </button>
-            </form>
-          )}
           {selectedPortal === 'admin' && (
             <div className="mt-5">
               <div className="flex items-center gap-3 mb-4 text-[10px] uppercase tracking-widest text-slate-500 font-mono">
