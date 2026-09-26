@@ -30,7 +30,7 @@
 
   html {
     background: var(--kc-bg-deep);
-    scroll-behavior: smooth;
+    scroll-behavior: auto;
   }
 
   body {
@@ -167,7 +167,6 @@
   box-shadow:
     0 8px 22px rgba(212, 160, 23, 0.20),
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
-  transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
 }
 
 .btn-primary-cyan:hover,
@@ -176,7 +175,7 @@
   box-shadow:
     0 12px 30px rgba(212, 160, 23, 0.30),
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transform: translateY(-2px);
+  transform: none;
 }
 
 .btn-primary-cyan:active,
@@ -190,7 +189,6 @@
   color: var(--kc-cream) !important;
   border: 1px solid var(--kc-border) !important;
   backdrop-filter: blur(8px);
-  transition: all 0.25s ease;
 }
 
 .btn-secondary-dark:hover,
@@ -198,7 +196,7 @@
   background: rgba(82, 13, 24, 0.92) !important;
   border-color: rgba(230, 199, 106, 0.65) !important;
   color: var(--kc-gold-bright) !important;
-  transform: translateY(-1px);
+  transform: none;
 }
 
 /* Premium form controls */
@@ -275,68 +273,35 @@ select:focus {
   background: linear-gradient(90deg, transparent, rgba(212, 160, 23, 0.65), transparent);
 }
 
-/* Animations */
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.96); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(16px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes floatSoft {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-
-@keyframes pulseGlow {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 0.8; }
-}
-
-@keyframes gridScroll {
-  from { background-position: 0 0; }
-  to { background-position: 40px 40px; }
-}
-
-.animate-fadeIn {
-  animation: fadeIn 0.4s ease-out forwards;
-}
-
-.animate-slideUp {
-  animation: slideUpFade 0.5s ease-out forwards;
-}
-
-.animate-float-soft {
-  animation: floatSoft 4s ease-in-out infinite;
-}
-
-.animate-pulse-glow {
-  animation: pulseGlow 3s ease-in-out infinite;
-}
-
-/* Global Reduced Motion Respect */
-@media (prefers-reduced-motion: reduce) {
-  *, ::before, ::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-
-html[data-reduced-motion="true"] *,
-html[data-reduced-motion="true"] ::before,
-html[data-reduced-motion="true"] ::after {
-  animation-duration: 0.01ms !important;
-  animation-iteration-count: 1 !important;
-  transition-duration: 0.01ms !important;
+/* Static UI mode — animations and animated transitions are disabled site-wide. */
+*,
+*::before,
+*::after {
+  animation: none !important;
+  transition: none !important;
   scroll-behavior: auto !important;
 }
 
+html {
+  scroll-behavior: auto !important;
+}
+
+[class*="hover\\:scale-"]:hover,
+[class*="hover\\:-translate-"]:hover,
+[class*="hover\\:translate-"]:hover {
+  transform: none !important;
+}
+
+.btn-primary-cyan:hover,
+.btn-primary:hover,
+.btn-secondary-dark:hover,
+.btn-secondary:hover,
+.kc-card:hover {
+  transform: none !important;
+}
+
 /* Print styling for logistics reports */
+
 @media print {
   body {
     background: #ffffff !important;
