@@ -79,12 +79,6 @@ export default async function handler(request: Request, response: Response) {
     return response.status(400).json({ error: 'Enter the five-digit administrator PIN.' });
   }
 
-  const pinHash = process.env.ADMIN_WORKPLACE_PIN_HASH;
-  if (!pinHash) {
-    console.error('ADMIN_WORKPLACE_PIN_HASH is not configured on the trusted backend.');
-    return response.status(503).json({ error: 'Administrator PIN verification is not configured on the server.' });
-  }
-
   const bearerToken = getBearerToken(request);
   if (!bearerToken) {
     return response.status(401).json({ error: 'Administrator authentication is required.' });
@@ -94,6 +88,14 @@ export default async function handler(request: Request, response: Response) {
     const app = getAdminApp();
     const adminAuth = getAuth(app);
     const firestore = getFirestore(app);
+
+    const pinConfig = await firestore.collection('adminSecurity').doc('config').get();
+    const storedPinHash = pinConfig.data()?.adminPinHash;
+    const pinHash = typeof storedPinHash === 'string' && storedPinHash ? storedPinHash : process.env.ADMIN_WORKPLACE_PIN_HASH;
+    if (!pinHash) {
+      console.error('No administrator PIN hash is configured.');
+      return response.status(503).json({ error: 'Administrator PIN verification is not configured on the server.' });
+    }
 
     let decodedToken;
     try {
