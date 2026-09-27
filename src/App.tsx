@@ -4,6 +4,7 @@ import { BrandingProvider } from './context/BrandingContext';
 import { AnimationProvider } from './context/AnimationContext';
 import { SharedLoginPortal } from './components/auth/SharedLoginPortal';
 import { WorkplaceSelector } from './components/auth/WorkplaceSelector';
+import { AdminOpenSetup } from './components/auth/AdminOpenSetup';
 import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Headphones, Phone, Mail } from 'lucide-react';
 
 const SessionLockScreen = lazy(() => import('./components/auth/SessionLockScreen').then((m) => ({ default: m.SessionLockScreen })));
