@@ -167,7 +167,7 @@ const AppContent: React.FC = () => {
       {/* Main Routed Views */}
       <main className="flex-grow">
         {/* Temporary Password Forced Change Flow */}
-        {currentUser && mustChangePassword && (role || '').toLowerCase() !== 'admin' ? (
+        {currentUser && mustChangePassword ? (
           <ChangePasswordScreen
             onSuccess={() => {
               const r = (userProfile?.role || '').toLowerCase();
