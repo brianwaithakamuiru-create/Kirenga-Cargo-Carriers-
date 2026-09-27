@@ -23,7 +23,7 @@ export const ChangePasswordScreen: React.FC<ChangePasswordScreenProps> = ({ onSu
     e.preventDefault();
     setError(null);
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       setError('Administrator password must be at least 8 characters long.');
       return;
     }
