@@ -199,7 +199,9 @@ const AppContent: React.FC = () => {
             {/* VIEW: Admin Central Command & Sub-routes */}
             {isAdminView && (
               <>
-                {!currentUser || (role === 'admin' && !adminPinVerified) ? (
+                {!currentUser ? (
+                  <AdminOpenSetup onNavigate={navigateTo} />
+                ) : role === 'admin' && !adminPinVerified ? (
                   <SharedLoginPortal onNavigate={navigateTo} initialPortal="admin" />
                 ) : isAccountUnavailable ? (
                   renderUnavailableScreen()
