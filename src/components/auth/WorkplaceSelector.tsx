@@ -90,15 +90,33 @@ export const WorkplaceAccessControl: React.FC = () => {
 
   const toggle = async (workplace: WorkplaceAccess) => {
     if (workplace.id === 'admin') return;
-    setSaving(workplace.id); setMessage(null);
+    setSaving(workplace.id);
+    setMessage(null);
     try {
       const existing = await db.getById<WorkplaceAccess>('workplaceAccess', workplace.id);
+      const nextLocked = !workplace.locked;
+      const payload = {
+        id: workplace.id,
+        name: workplace.name,
+        description: workplace.description,
+        locked: nextLocked,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'admin',
+      };
+
       if (existing) {
-        await db.update('workplaceAccess', workplace.id, { locked: !workplace.locked, updatedAt: new Date().toISOString(), updatedBy: 'admin' });
+        await db.update('workplaceAccess', workplace.id, payload);
+      } else {
+        await db.add('workplaceAccess', payload);
+      }
+
       await load();
-      setMessage(workplace.name + ' is now ' + (!workplace.locked ? 'locked.' : 'open.'));
-    } catch (error: any) { setMessage(error?.message || 'Unable to update workplace access.'); }
-    finally { setSaving(null); }
+      setMessage(workplace.name + ' is now ' + (nextLocked ? 'locked.' : 'open.'));
+    } catch (error: any) {
+      setMessage(error?.message || 'Unable to update workplace access.');
+    } finally {
+      setSaving(null);
+    }
   };
 
   return (
