@@ -39,7 +39,11 @@ export const WorkplaceSelector: React.FC<WorkplaceSelectorProps> = ({ onNavigate
   }, []);
 
   const openWorkplace = (workplace: WorkplaceAccess) => {
-    if (workplace.id === 'admin' || workplace.locked) { onNavigate(workplace.id); return; }
+    if (workplace.id === 'admin' || workplace.locked) {
+      window.sessionStorage.removeItem('kcc-selected-workplace');
+      onNavigate(workplace.id);
+      return;
+    }
     window.sessionStorage.setItem('kcc-selected-workplace', workplace.id);
     onNavigate(workplace.id);
   };
