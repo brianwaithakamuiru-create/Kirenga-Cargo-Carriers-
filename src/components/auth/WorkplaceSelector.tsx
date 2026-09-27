@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Lock, Shield, Truck, Users, Settings2, Unlock, Loader2, KeyRound } from 'lucide-react';
 import { db } from '../../lib/firestoreService';
+import { auth } from '../../lib/firebase';
+import { getIdToken } from 'firebase/auth';
 import { CompanyLogo } from '../common/CompanyLogo';
 
 export type WorkplaceId = 'admin' | 'driver' | 'staff';
@@ -168,7 +170,9 @@ export const WorkplaceAccessControl: React.FC = () => {
                 setPinSaving(true);
                 setMessage(null);
                 try {
-                  const token = await import('firebase/auth').then(({ getIdToken }) => getIdToken((await import('../../lib/firebase')).auth.currentUser!));
+                  const currentAuthUser = auth.currentUser;
+                  if (!currentAuthUser) throw new Error('Administrator session is not active.');
+                  const token = await getIdToken(currentAuthUser);
                   const response = await fetch('/api/admin-pin-config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
