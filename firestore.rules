@@ -183,6 +183,15 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------
+    // WORKPLACE ACCESS (Public selector metadata, Admin-controlled writes)
+    // ----------------------------------------------------
+    match /workplaceAccess/{workplaceId} {
+      // Only non-sensitive workplace state is stored here. Never store passwords or PINs.
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ----------------------------------------------------
     // USERS (Admin-created accounts + Initial Bootstrap)
     // ----------------------------------------------------
     
