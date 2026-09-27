@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Lock, Shield, Truck, Users, Settings2, Unlock, Loader2 } from 'lucide-react';
+import { ArrowLeft, BriefcaseBusiness, CheckCircle2, Lock, Shield, Truck, Users, Settings2, Unlock, Loader2, KeyRound } from 'lucide-react';
 import { db } from '../../lib/firestoreService';
 import { CompanyLogo } from '../common/CompanyLogo';
 
@@ -85,6 +85,8 @@ export const WorkplaceAccessControl: React.FC = () => {
   const [workplaces, setWorkplaces] = useState<WorkplaceAccess[]>(DEFAULT_WORKPLACES);
   const [saving, setSaving] = useState<WorkplaceId | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [adminPin, setAdminPin] = useState('');
+  const [pinSaving, setPinSaving] = useState(false);
   const load = async () => setWorkplaces(await getWorkplaces());
   useEffect(() => { void load(); }, []);
 
@@ -140,6 +142,53 @@ export const WorkplaceAccessControl: React.FC = () => {
               </div>
             );
           })}
+        </div>
+        <div className="mt-6 rounded-2xl border border-cyan-500/20 bg-cyan-950/20 p-5">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-cyan-950/70 border border-cyan-500/20 flex items-center justify-center text-cyan-300"><KeyRound className="w-5 h-5" /></div>
+            <div>
+              <h3 className="font-bold text-white text-sm">Administrator PIN</h3>
+              <p className="text-[11px] text-slate-500">Set or replace the five-digit Admin PIN directly from the website. The PIN itself is never stored in the browser or Firestore.</p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <input
+              value={adminPin}
+              onChange={(e) => setAdminPin(e.target.value.replace(/\D/g, '').slice(0, 5))}
+              inputMode="numeric"
+              maxLength={5}
+              type="password"
+              placeholder="New 5-digit PIN"
+              className="flex-1 rounded-xl border border-slate-700 bg-slate-950 px-4 py-2.5 text-sm text-white tracking-[0.35em] focus:outline-none focus:border-cyan-400"
+            />
+            <button
+              type="button"
+              disabled={pinSaving || adminPin.length !== 5}
+              onClick={async () => {
+                setPinSaving(true);
+                setMessage(null);
+                try {
+                  const token = await import('firebase/auth').then(({ getIdToken }) => getIdToken((await import('../../lib/firebase')).auth.currentUser!));
+                  const response = await fetch('/api/admin-pin-config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                    body: JSON.stringify({ pin: adminPin }),
+                  });
+                  const result = await response.json().catch(() => ({}));
+                  if (!response.ok || result.success !== true) throw new Error(result.error || 'Unable to update Admin PIN.');
+                  setAdminPin('');
+                  setMessage('Administrator PIN updated successfully from the website.');
+                } catch (error: any) {
+                  setMessage(error?.message || 'Unable to update Admin PIN.');
+                } finally {
+                  setPinSaving(false);
+                }
+              }}
+              className="rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 px-5 py-2.5 text-xs font-bold text-white disabled:opacity-50"
+            >
+              {pinSaving ? 'Updating…' : 'Set Admin PIN'}
+            </button>
+          </div>
         </div>
         {message && <div className="mt-5 rounded-xl border border-cyan-500/20 bg-cyan-950/30 px-4 py-3 text-xs text-cyan-200">{message}</div>}
       </div>
