@@ -73,6 +73,7 @@ import { CentralReports } from './CentralReports';
 import { LiveTrackingMap } from './LiveTrackingMap';
 import { WorkplaceAppearanceControl } from './WorkplaceAppearanceControl';
 import { CompanyLogo } from '../common/CompanyLogo';
+import { WorkplaceAccessControl } from '../auth/WorkplaceSelector';
 
 interface AdminDashboardProps {
   onNavigate?: (view: string) => void;
@@ -102,7 +103,8 @@ export type AdminNavKey =
   | 'workforce'
   | 'add-staff'
   | 'add-driver'
-  | 'warehouse';
+  | 'warehouse'
+  | 'workplace-access';
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, initialNav }) => {
   const { currentUser, userProfile, role, signOut, lockSession } = useAuth();
@@ -128,6 +130,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     if (clean === 'checkpoints') return 'checkpoints';
     if (clean === 'appearance' || clean === 'permissions') return 'appearance';
     if (clean === 'warehouse') return 'warehouse';
+    if (clean === 'workplace-access') return 'workplace-access';
     if (clean === 'reports') return 'reports';
     if (clean === 'notifications') return 'notifications';
     if (clean === 'website') return 'website';
@@ -547,6 +550,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
     { key: 'fleet', label: 'Fleet', icon: Truck, badge: vehicles.length },
     { key: 'drivers', label: 'Drivers', icon: Compass, badge: drivers.length },
     { key: 'staff', label: 'Staff', icon: Briefcase },
+    { key: 'workplace-access', label: 'Workplace Access', icon: Lock },
     { key: 'customers', label: 'Customers', icon: Users, badge: clients.length },
     { key: 'finance', label: 'Finance', icon: DollarSign, badge: unpaidInvoices.length },
     { key: 'documents', label: 'Documents & Compliance', icon: FileText, badge: expiringDocs.length },
@@ -1575,6 +1579,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNavigate, init
             ============================================================ */}
         {activeNav === 'appearance' && <WorkplaceAppearanceControl />}
         {activeNav === 'settings' && <AdminSettings />}
+        {activeNav === 'workplace-access' && <WorkplaceAccessControl />}
 
         {/* ============================================================
             SECTION: SECURITY
