@@ -192,6 +192,13 @@ service cloud.firestore {
     }
 
     // ----------------------------------------------------
+    // ADMIN SECURITY CONFIG (PIN hash is server-only)
+    // ----------------------------------------------------
+    match /adminSecurity/{configId} {
+      allow read, write: if false;
+    }
+
+    // ----------------------------------------------------
     // USERS (Admin-created accounts + Initial Bootstrap)
     // ----------------------------------------------------
     
