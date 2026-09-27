@@ -150,6 +150,7 @@ const AppContent: React.FC = () => {
   );
 
   const isAdminView = currentView === 'admin' || currentView.startsWith('admin/');
+  const directWorkplace = typeof window !== 'undefined' ? window.sessionStorage.getItem('kcc-selected-workplace') : null;
   const isDashboardView = isAdminView || ['driver', 'staff', 'worker'].includes(currentView);
 
   return (
@@ -212,10 +213,12 @@ const AppContent: React.FC = () => {
             {/* VIEW: Driver Workplace */}
             {currentView === 'driver' && (
               <>
-                {!currentUser ? (
-                  <SharedLoginPortal onNavigate={navigateTo} />
+                {!currentUser && directWorkplace !== 'driver' ? (
+                  <SharedLoginPortal onNavigate={navigateTo} initialPortal="driver" />
                 ) : isAccountUnavailable ? (
                   renderUnavailableScreen()
+                ) : !currentUser && directWorkplace === 'driver' ? (
+                  <DriverPortal onNavigate={navigateTo} />
                 ) : role !== 'driver' && role !== 'admin' ? (
                   renderRoleMismatch('driver')
                 ) : (
@@ -227,10 +230,12 @@ const AppContent: React.FC = () => {
             {/* VIEW: Staff Workplace (also supports /worker) */}
             {(currentView === 'staff' || currentView === 'worker') && (
               <>
-                {!currentUser ? (
-                  <SharedLoginPortal onNavigate={navigateTo} />
+                {!currentUser && directWorkplace !== 'staff' ? (
+                  <SharedLoginPortal onNavigate={navigateTo} initialPortal="staff" />
                 ) : isAccountUnavailable ? (
                   renderUnavailableScreen()
+                ) : !currentUser && directWorkplace === 'staff' ? (
+                  <WorkerPortal onNavigate={navigateTo} />
                 ) : role !== 'staff' && role !== 'worker' && role !== 'admin' ? (
                   renderRoleMismatch('staff')
                 ) : (
