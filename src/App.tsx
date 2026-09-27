@@ -3,6 +3,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { BrandingProvider } from './context/BrandingContext';
 import { AnimationProvider } from './context/AnimationContext';
 import { SharedLoginPortal } from './components/auth/SharedLoginPortal';
+import { WorkplaceSelector } from './components/auth/WorkplaceSelector';
 import { ShieldAlert, AlertTriangle, LogOut, ArrowRight, Headphones, Phone, Mail } from 'lucide-react';
 
 const SessionLockScreen = lazy(() => import('./components/auth/SessionLockScreen').then((m) => ({ default: m.SessionLockScreen })));
@@ -178,7 +179,7 @@ const AppContent: React.FC = () => {
         ) : (
           <>
             {/* VIEW: Login Portal */}
-            {currentView === 'login' && <SharedLoginPortal onNavigate={navigateTo} />}
+            {currentView === 'login' && <WorkplaceSelector onNavigate={navigateTo} />}
 
             {/* VIEW: Change Password */}
             {currentView === 'change-password' && (
