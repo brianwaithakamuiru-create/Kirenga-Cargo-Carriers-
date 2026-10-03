@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Truck, Calendar, MapPin, Package, FileUp, CheckCircle, AlertCircle, ArrowRight, Printer } from 'lucide-react';
-import { db } from '../../lib/firestoreService';
 import { Booking } from '../../types';
 import { CompanyLogo } from '../common/CompanyLogo';
 import { useBranding } from '../../context/BrandingContext';
@@ -9,6 +8,8 @@ interface BookingFormProps {
   onSuccess?: (booking: Booking) => void;
   onNavigate?: (view: string) => void;
 }
+
+const BOOKING_DRAFT_KEY = 'kirenga-booking-draft-v1';
 
 export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate }) => {
   const { companyName } = useBranding();
@@ -35,6 +36,44 @@ export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate 
     documentName: '',
     documentData: '',
   });
+
+  // Restore only non-sensitive booking preferences locally. This keeps the form
+  // responsive and avoids an initial Firestore request just to prefill fields.
+  React.useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(BOOKING_DRAFT_KEY);
+      if (!saved) return;
+      const draft = JSON.parse(saved);
+      if (draft && typeof draft === 'object') {
+        setFormData((prev) => ({
+          ...prev,
+          pickupCountry: typeof draft.pickupCountry === 'string' ? draft.pickupCountry : prev.pickupCountry,
+          deliveryCountry: typeof draft.deliveryCountry === 'string' ? draft.deliveryCountry : prev.deliveryCountry,
+          cargoType: typeof draft.cargoType === 'string' ? draft.cargoType : prev.cargoType,
+          quantity: typeof draft.quantity === 'string' ? draft.quantity : prev.quantity,
+          deliveryRequirements: typeof draft.deliveryRequirements === 'string' ? draft.deliveryRequirements : prev.deliveryRequirements,
+        }));
+      }
+    } catch {
+      // Ignore malformed/stale local draft data.
+    }
+  }, []);
+
+  // Save lightweight preferences only; never persist personal contact details,
+  // uploaded documents, or cargo descriptions in localStorage.
+  React.useEffect(() => {
+    try {
+      window.localStorage.setItem(BOOKING_DRAFT_KEY, JSON.stringify({
+        pickupCountry: formData.pickupCountry,
+        deliveryCountry: formData.deliveryCountry,
+        cargoType: formData.cargoType,
+        quantity: formData.quantity,
+        deliveryRequirements: formData.deliveryRequirements,
+      }));
+    } catch {
+      // Storage may be unavailable in private/restricted browser contexts.
+    }
+  }, [formData.pickupCountry, formData.deliveryCountry, formData.cargoType, formData.quantity, formData.deliveryRequirements]);
 
   const countries = [
     'Kenya',
@@ -86,6 +125,9 @@ export const BookingForm: React.FC<BookingFormProps> = ({ onSuccess, onNavigate 
 
     setLoading(true);
     try {
+      // Firestore is loaded on demand, after validation, rather than blocking the
+      // initial booking-page render with the database SDK.
+      const { db } = await import('../../lib/firestoreService');
       const saved = await db.createBooking({
         fullName: formData.fullName.trim(),
         phone: formData.phone.trim(),
